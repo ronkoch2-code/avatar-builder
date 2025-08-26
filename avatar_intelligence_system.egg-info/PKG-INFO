@@ -1,0 +1,248 @@
+Metadata-Version: 2.4
+Name: avatar-intelligence-system
+Version: 1.0.0
+Summary: AI-powered conversation analysis and personalized avatar generation system
+Home-page: https://github.com/yourusername/avatar-intelligence-system
+Author: Ron Koch
+Author-email: Ron Koch <your.email@example.com>
+Maintainer-email: Ron Koch <your.email@example.com>
+License: MIT License
+        
+        Copyright (c) 2025 Ron Koch
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        
+Project-URL: Homepage, https://github.com/yourusername/avatar-intelligence-system
+Project-URL: Documentation, https://github.com/yourusername/avatar-intelligence-system/blob/main/README.md
+Project-URL: Repository, https://github.com/yourusername/avatar-intelligence-system
+Project-URL: Changelog, https://github.com/yourusername/avatar-intelligence-system/blob/main/CHANGELOG.md
+Project-URL: Bug Tracker, https://github.com/yourusername/avatar-intelligence-system/issues
+Keywords: ai,avatar,conversation-analysis,neo4j,nlp,chatbot,personalization
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Communications :: Chat
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: neo4j>=5.0.0
+Requires-Dist: pandas>=1.5.0
+Requires-Dist: numpy>=1.21.0
+Requires-Dist: python-dateutil>=2.8.0
+Requires-Dist: regex>=2022.0.0
+Requires-Dist: typing-extensions>=4.0.0; python_version < "3.8"
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: black>=21.0; extra == "dev"
+Requires-Dist: flake8>=3.8; extra == "dev"
+Requires-Dist: mypy>=0.800; extra == "dev"
+Requires-Dist: isort>=5.0; extra == "dev"
+Requires-Dist: pre-commit>=2.0; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: sphinx>=4.0; extra == "docs"
+Requires-Dist: sphinx-rtd-theme>=0.5; extra == "docs"
+Requires-Dist: myst-parser>=0.17; extra == "docs"
+Provides-Extra: test
+Requires-Dist: pytest>=6.0; extra == "test"
+Requires-Dist: pytest-cov>=2.0; extra == "test"
+Requires-Dist: pytest-mock>=3.0; extra == "test"
+Dynamic: author
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+
+# Avatar Intelligence System - Complete Setup Guide
+
+## 📁 Directory Structure
+
+Your Avatar Engine directory is set up as follows:
+
+```
+/Volumes/FS001/pythonscripts/Avatar-Engine/
+├── README.md                           # This setup guide
+├── requirements.txt                    # Python dependencies  
+├── setup.sh                          # Automated setup script
+├── src/                               # Main source code
+│   ├── __init__.py
+│   ├── avatar_intelligence_pipeline.py    # Complete analysis pipeline
+│   └── avatar_system_deployment.py        # Deployment and management
+├── sql/                               # Database files
+│   └── avatar_intelligence_schema.cypher  # Neo4j schema
+├── docs/                              # Documentation
+│   ├── relationship_inference_guide.md
+│   ├── nickname_detection_guide.md
+│   └── usage_examples.md
+├── examples/                          # Usage examples
+│   └── basic_usage.py
+└── tests/                            # Test scripts
+    └── test_deployment.py
+```
+
+## 🚀 Quick Start
+
+### Step 1: Install Dependencies
+
+```bash
+cd /Volumes/FS001/pythonscripts/Avatar-Engine/
+pip install -r requirements.txt
+```
+
+### Step 2: Deploy the System
+
+```bash
+# Deploy schema and system
+python src/avatar_system_deployment.py \
+    --password YOUR_NEO4J_PASSWORD \
+    --command deploy
+
+# Check deployment status
+python src/avatar_system_deployment.py \
+    --password YOUR_NEO4J_PASSWORD \
+    --command status
+```
+
+### Step 3: Test the Installation
+
+```bash
+# Run basic example
+python examples/basic_usage.py
+```
+
+## 📋 File Descriptions
+
+### Core Files
+
+- **`src/avatar_intelligence_pipeline.py`** - Complete analysis system with:
+  - Nickname detection engine
+  - Relationship inference engine  
+  - Linguistic analysis
+  - Avatar generation pipeline
+  - Runtime system for fast queries
+
+- **`src/avatar_system_deployment.py`** - System management:
+  - Schema deployment
+  - System health monitoring
+  - Maintenance operations
+
+- **`sql/avatar_intelligence_schema.cypher`** - Database schema:
+  - Node constraints and indexes
+  - System metadata setup
+  - Sample queries and verification
+
+## ⚙️ Configuration
+
+### Neo4j Connection
+
+Edit connection settings in your scripts or use environment variables:
+
+```python
+# Direct configuration
+NEO4J_URI = "bolt://localhost:7687"
+NEO4J_USERNAME = "neo4j" 
+NEO4J_PASSWORD = "your_password"
+```
+
+## 🎯 Basic Usage Example
+
+```python
+from src.avatar_intelligence_pipeline import AvatarSystemManager
+from neo4j import GraphDatabase
+
+# Initialize system
+driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
+avatar_system = AvatarSystemManager(driver)
+
+# Process all people with sufficient conversation data
+stats = avatar_system.initialize_all_people(min_messages=50)
+print(f"Processed {stats['created']} people")
+
+# Generate avatar response
+prompt = avatar_system.generate_response(
+    person_identifier="clAIre Russell",
+    conversation_type="1:1",
+    partners=["Ron Koch"],
+    topic="health"
+)
+
+print("Avatar prompt:", prompt)
+driver.close()
+```
+
+## 🔧 System Requirements
+
+### Prerequisites
+- **Neo4j 5.0+** with existing conversation data loaded
+- **Python 3.7+** 
+- **Memory**: 4GB+ recommended for large conversation datasets
+
+### Existing Data Schema
+Your Neo4j database should have:
+- `Person` nodes with `id`, `name`, `phone` properties
+- `Message` nodes with `body`, `date`, `isFromMe` properties  
+- `GroupChat` nodes for conversation context
+- Relationships: `Person-[:SENT]->Message`, `Message-[:SENT_TO]->GroupChat`, `Person-[:MEMBER_OF]->GroupChat`
+
+## 🧪 Testing Your Installation
+
+### 1. Test Database Connection
+```python
+from neo4j import GraphDatabase
+
+try:
+    driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
+    with driver.session() as session:
+        result = session.run("MATCH (p:Person) RETURN count(p) as people").single()
+        print(f"✓ Connected! Found {result['people']} people in database")
+    driver.close()
+except Exception as e:
+    print(f"✗ Connection failed: {e}")
+```
+
+### 2. Verify Schema Deployment
+```bash
+python src/avatar_system_deployment.py --password PASSWORD --command status
+```
+
+### 3. Process a Single Person
+```python
+# Test with one person
+stats = avatar_system.initialize_person("clAIre Russell", identifier_type="name")
+print(f"✓ Created profile: {stats}")
+```
+
+## 📈 Next Steps After Installation
+
+1. **Process Your Data**: Start with `initialize_all_people(min_messages=50)`
+2. **Explore Relationships**: Use `get_person_relationships()` to see detected relationships
+3. **Test Avatar Generation**: Generate prompts for different conversation contexts
+4. **Analyze Nicknames**: Check nickname detection with `get_person_nicknames()`
+5. **Integrate with AI**: Feed generated prompts to ChatGPT, Claude, or other LLMs
+
+---
+
+🎉 **You're ready to build personalized AI avatars from your conversation data!**

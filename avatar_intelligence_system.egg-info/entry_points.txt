@@ -1,0 +1,3 @@
+[console_scripts]
+avatar-deploy = src.avatar_system_deployment:main
+avatar-pipeline = src.avatar_intelligence_pipeline:main

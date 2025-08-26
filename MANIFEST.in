@@ -1,0 +1,44 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include requirements.txt
+include pyproject.toml
+include setup.py
+
+# Source code
+recursive-include src *.py
+include src/__init__.py
+
+# Documentation
+recursive-include docs *.md
+recursive-include docs *.rst
+recursive-include docs *.txt
+
+# Examples
+recursive-include examples *.py
+recursive-include examples *.md
+
+# SQL and database files
+recursive-include sql *.cypher
+recursive-include sql *.sql
+
+# Tests
+recursive-include tests *.py
+
+# Configuration files
+include .gitignore
+include Makefile
+
+# Exclude development and build artifacts
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *~
+global-exclude .DS_Store
+global-exclude __pycache__
+global-exclude .git*
+global-exclude .pytest_cache
+global-exclude .coverage
+global-exclude .mypy_cache
+global-exclude *.egg-info
+global-exclude build
+global-exclude dist

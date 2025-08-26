@@ -1,0 +1,143 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "avatar-intelligence-system"
+version = "1.0.0"
+description = "AI-powered conversation analysis and personalized avatar generation system"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Ron Koch", email = "your.email@example.com"},
+]
+maintainers = [
+    {name = "Ron Koch", email = "your.email@example.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Communications :: Chat",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+keywords = ["ai", "avatar", "conversation-analysis", "neo4j", "nlp", "chatbot", "personalization"]
+requires-python = ">=3.7"
+dependencies = [
+    "neo4j>=5.0.0",
+    "pandas>=1.5.0",
+    "numpy>=1.21.0",
+    "python-dateutil>=2.8.0",
+    "regex>=2022.0.0",
+    "typing-extensions>=4.0.0; python_version<'3.8'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "black>=21.0",
+    "flake8>=3.8",
+    "mypy>=0.800",
+    "isort>=5.0",
+    "pre-commit>=2.0",
+]
+docs = [
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=0.5",
+    "myst-parser>=0.17",
+]
+test = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0",
+    "pytest-mock>=3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/avatar-intelligence-system"
+Documentation = "https://github.com/yourusername/avatar-intelligence-system/blob/main/README.md"
+Repository = "https://github.com/yourusername/avatar-intelligence-system"
+Changelog = "https://github.com/yourusername/avatar-intelligence-system/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/yourusername/avatar-intelligence-system/issues"
+
+[project.scripts]
+avatar-deploy = "src.avatar_system_deployment:main"
+avatar-pipeline = "src.avatar_intelligence_pipeline:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*", "sql*", "docs*", "examples*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.txt", "*.cypher", "*.py"]
+
+[tool.black]
+line-length = 100
+target-version = ['py37', 'py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 100
+
+[tool.mypy]
+python_version = "3.7"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers"
+testpaths = [
+    "tests",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
