@@ -63,6 +63,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - mypy: Type checking
 - isort: Import sorting
 
+## [1.0.2] - 2025-08-27
+### Fixed
+- Updated Claude model identifier to current Claude Sonnet 4 model `claude-sonnet-4-20250514`
+- Corrected model from multiple deprecated versions to the latest Claude 4 release
+- Fixed 404 API errors when making LLM calls
+- Added utility scripts for configuration updates:
+  - `fix_model_config.py` - Updates existing configurations with correct model
+  - `update_system.py` - Complete system update and verification
+  - `test_model_update.py` - Verify model configuration is correct
+
+### Added
+- Automatic model version detection and update scripts
+- Configuration verification utilities
+- Model validation test script
+
 ## [Unreleased]
 ### Planned
 - Advanced sentiment analysis
@@ -78,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | Status | Description |
 |---------|------------|--------|-------------|
+| 1.0.2   | 2025-08-27 | ✅ Released | Fixed Claude model to Sonnet 4 |
 | 1.0.0   | 2025-08-25 | ✅ Released | Initial stable release |
 
 ## Contributing

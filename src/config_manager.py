@@ -37,7 +37,7 @@ class Neo4jConfig:
 class AnthropicConfig:
     """Anthropic/Claude configuration"""
     api_key: str = ""
-    model: str = "claude-3-5-sonnet-20240620"
+    model: str = "claude-sonnet-4-20250514"
     max_tokens: int = 4000
     temperature: float = 0.1
     max_concurrent_requests: int = 3
