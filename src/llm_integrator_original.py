@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LLM Integration Module for Avatar Intelligence System (FIXED VERSION)
+LLM Integration Module for Avatar Intelligence System
 ====================================================
 
 This module provides comprehensive LLM-powered analysis for personality profiling,
@@ -12,7 +12,6 @@ Key Features:
 - Cost monitoring and rate limiting
 - Structured output with validation
 - Conversation context understanding
-- FIXED: Robust JSON parsing for LLM responses
 """
 
 import asyncio
@@ -20,7 +19,6 @@ import json
 import logging
 import os
 import uuid
-import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any, Union
 from dataclasses import dataclass, field
@@ -128,7 +126,7 @@ class LLMIntegrator:
     
     def __init__(self, 
                  api_key: Optional[str] = None,
-                 model: str = "claude-sonnet-4-20250514",
+                 model: str = "claude-3-sonnet-20240229",
                  max_concurrent: int = 5,
                  rate_limit_per_minute: int = 100):
         """
@@ -154,56 +152,12 @@ class LLMIntegrator:
         self.total_cost = 0.0
         self.analysis_history = []
         
-        # Updated pricing for newer models
+        # Pricing (per 1K tokens) - update as needed
         self.pricing = {
             "claude-3-sonnet-20240229": {"input": 0.003, "output": 0.015},
             "claude-3-opus-20240229": {"input": 0.015, "output": 0.075},
-            "claude-3-haiku-20240307": {"input": 0.00025, "output": 0.00125},
-            "claude-sonnet-4-20250514": {"input": 0.003, "output": 0.015}  # Adjust based on actual pricing
+            "claude-3-haiku-20240307": {"input": 0.00025, "output": 0.00125}
         }
-    
-    def _extract_json_from_response(self, response_text: str) -> Dict[str, Any]:
-        """
-        Extract JSON from LLM response that might contain markdown or other formatting
-        
-        Args:
-            response_text: Raw response from LLM
-            
-        Returns:
-            Parsed JSON dictionary
-        """
-        # Log the raw response for debugging
-        logger.debug(f"Raw LLM response: {response_text[:500]}...")
-        
-        # Try direct JSON parsing first
-        try:
-            return json.loads(response_text.strip())
-        except json.JSONDecodeError:
-            pass
-        
-        # Try to extract JSON from markdown code block
-        json_pattern = r'```(?:json)?\s*\n?([\s\S]*?)\n?```'
-        matches = re.findall(json_pattern, response_text)
-        if matches:
-            try:
-                return json.loads(matches[0])
-            except json.JSONDecodeError:
-                pass
-        
-        # Try to find JSON object in the text
-        json_object_pattern = r'\{[\s\S]*\}'
-        matches = re.findall(json_object_pattern, response_text)
-        if matches:
-            # Try the largest match first (likely the complete JSON)
-            for match in sorted(matches, key=len, reverse=True):
-                try:
-                    return json.loads(match)
-                except json.JSONDecodeError:
-                    continue
-        
-        # If all else fails, log the response and raise an error
-        logger.error(f"Could not extract JSON from response. First 1000 chars: {response_text[:1000]}")
-        raise ValueError(f"Failed to extract valid JSON from LLM response")
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def _call_llm(self, system_prompt: str, user_prompt: str) -> Tuple[str, Dict[str, Any]]:
@@ -306,10 +260,7 @@ Your task is to analyze conversation data and provide insights into:
 - Communication preferences and behavioral patterns
 - Key personality insights based on conversation style and content
 
-IMPORTANT: Respond ONLY with a valid JSON object. Do not include any explanatory text, markdown formatting, or code blocks. 
-The response must be a single JSON object that can be directly parsed.
-
-Required JSON structure:
+Provide your analysis as a structured JSON response with the following format:
 {
     "big_five_scores": {
         "openness": 0.0-1.0,
@@ -326,7 +277,9 @@ Required JSON structure:
     },
     "behavioral_patterns": ["pattern1", "pattern2", ...],
     "confidence_score": 0.0-1.0
-}"""
+}
+
+Base your analysis on observable communication patterns, word choice, topic engagement, emotional expression, and interaction styles."""
         
         conversation_context = self._prepare_conversation_context(
             request.conversation_data, 
@@ -337,15 +290,13 @@ Required JSON structure:
 
 {conversation_context}
 
-Remember to respond ONLY with a valid JSON object following the specified format. No additional text or formatting."""
+Please provide a comprehensive personality analysis following the specified JSON format. Focus on patterns you can observe in their communication style, topics they engage with, how they express emotions, and their interaction patterns with others."""
         
         try:
             response_text, metadata = await self._call_llm(system_prompt, user_prompt)
             
-            # Parse JSON response with robust extraction
-            analysis_data = self._extract_json_from_response(response_text)
-            
-            # Validate and create PersonalityProfile
+            # Parse JSON response
+            analysis_data = json.loads(response_text.strip())
             personality_profile = PersonalityProfile(**analysis_data)
             
             result = AnalysisResult(
@@ -365,36 +316,9 @@ Remember to respond ONLY with a valid JSON object following the specified format
             
             return result
             
-        except (json.JSONDecodeError, ValidationError, ValueError) as e:
+        except (json.JSONDecodeError, ValidationError) as e:
             logger.error(f"Failed to parse LLM response for personality analysis: {str(e)}")
-            # Return a default profile with error indication
-            default_profile = PersonalityProfile(
-                big_five_scores={
-                    "openness": 0.5,
-                    "conscientiousness": 0.5,
-                    "extraversion": 0.5,
-                    "agreeableness": 0.5,
-                    "neuroticism": 0.5
-                },
-                personality_insights=["Analysis failed - insufficient data or parsing error"],
-                communication_preferences={"error": str(e)},
-                behavioral_patterns=["Error in analysis"],
-                confidence_score=0.0
-            )
-            
-            result = AnalysisResult(
-                request_id=str(uuid.uuid4()),
-                person_id=request.person_id,
-                analysis_type=AnalysisType.PERSONALITY_PROFILE,
-                result=default_profile,
-                metadata={"error": str(e), "cost": 0.0},
-                tokens_used=0,
-                cost=0.0,
-                processing_time=0.0,
-                timestamp=datetime.now()
-            )
-            return result
-            
+            raise
         except Exception as e:
             logger.error(f"Personality analysis failed: {str(e)}")
             raise
@@ -430,9 +354,13 @@ Remember to respond ONLY with a valid JSON object following the specified format
 
 Analyze the relationship between {request.person_name} and {partner_name} based on their conversation patterns.
 
-IMPORTANT: Respond ONLY with a valid JSON object. Do not include any explanatory text, markdown formatting, or code blocks.
+Provide insights into:
+- Relationship type (family, friend, colleague, romantic, etc.)
+- Communication intimacy level
+- Emotional dynamics and interaction patterns
+- Main conversation topics and shared interests
 
-Required JSON structure:
+Respond with structured JSON:
 {{
     "partner_name": "{partner_name}",
     "relationship_type": "type",
@@ -453,14 +381,11 @@ Required JSON structure:
 
 {conversation_context}
 
-Remember to respond ONLY with a valid JSON object following the specified format."""
+Focus on communication patterns, emotional undertones, topics discussed, and the nature of their interaction."""
             
             try:
                 response_text, metadata = await self._call_llm(system_prompt, user_prompt)
-                
-                # Parse JSON response with robust extraction
-                analysis_data = self._extract_json_from_response(response_text)
-                
+                analysis_data = json.loads(response_text.strip())
                 relationship_dynamic = RelationshipDynamic(**analysis_data)
                 
                 result = AnalysisResult(
@@ -478,7 +403,7 @@ Remember to respond ONLY with a valid JSON object following the specified format
                 results.append(result)
                 self.analysis_history.append(result)
                 
-            except (json.JSONDecodeError, ValidationError, ValueError) as e:
+            except (json.JSONDecodeError, ValidationError) as e:
                 logger.error(f"Failed to parse relationship analysis for {partner_name}: {str(e)}")
                 continue
             except Exception as e:
@@ -491,23 +416,12 @@ Remember to respond ONLY with a valid JSON object following the specified format
     def _identify_conversation_partner(self, message: Dict[str, Any], person_name: str) -> Optional[str]:
         """
         Identify conversation partner from message context
+        
+        This is a simplified implementation - you may need to enhance based on your data structure
         """
-        # First check for partner_name field
-        if 'partner_name' in message:
-            return message['partner_name']
-        
-        # Then check partners list
-        partners = message.get('partners', [])
-        if partners and len(partners) == 1:
-            return partners[0]
-        
-        # Check group chat name
-        group_name = message.get('group_chat_name')
-        if group_name:
-            return group_name
-            
-        # Default to Unknown if can't identify
-        return message.get('group_chat_id', 'Unknown')
+        # This would need to be implemented based on your specific data structure
+        # For now, returning a placeholder
+        return message.get('partner_name') or message.get('group_chat', 'Unknown')
     
     async def batch_analyze(self, requests: List[AnalysisRequest]) -> List[AnalysisResult]:
         """
@@ -575,7 +489,7 @@ Remember to respond ONLY with a valid JSON object following the specified format
 if __name__ == "__main__":
     async def main():
         # Initialize LLM integrator
-        llm = LLMIntegrator(model="claude-sonnet-4-20250514")
+        llm = LLMIntegrator(model="claude-3-sonnet-20240229")
         
         # Example conversation data
         sample_messages = [
@@ -585,17 +499,16 @@ if __name__ == "__main__":
         
         # Create analysis request
         request = AnalysisRequest(
-            person_id="test_001",
-            person_name="Test User",
+            person_id="person_test",
+            person_name="Test Person",
             analysis_type=AnalysisType.PERSONALITY_PROFILE,
             conversation_data=sample_messages
         )
         
         # Run analysis
         result = await llm.analyze_personality(request)
-        print(f"Analysis complete: {result}")
-        
-        # Get cost summary
-        print(f"Cost summary: {llm.get_cost_summary()}")
+        print(f"Analysis completed: {result.result}")
+        print(f"Cost: ${result.cost:.4f}")
     
-    asyncio.run(main())
+    # Run example
+    # asyncio.run(main())
