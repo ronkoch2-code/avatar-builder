@@ -123,9 +123,9 @@ class EnhancedAvatarSystemManager:
             person_id = person_result["person_id"]
             person_name = person_result["person_name"]
             
-            # Get conversation messages - improved query to capture conversation partners
-            messages_query = f"""
-            MATCH (p:Person {{id: $person_id}})-[:SENT]->(m:Message)
+            # Get conversation messages - use string format instead of f-string for LIMIT
+            messages_query = """
+            MATCH (p:Person {id: $person_id})-[:SENT]->(m:Message)
             OPTIONAL MATCH (m)-[:SENT_TO]->(gc:GroupChat)
             OPTIONAL MATCH (gc)<-[:MEMBER_OF]-(partner:Person)
             WHERE partner.id <> $person_id
@@ -138,10 +138,10 @@ class EnhancedAvatarSystemManager:
                    gc.name as group_chat_name,
                    partners
             ORDER BY m.date DESC
-            LIMIT {max_messages}
+            LIMIT $max_messages
             """
             
-            messages_result = session.run(messages_query, person_id=person_id)
+            messages_result = session.run(messages_query, person_id=person_id, max_messages=max_messages)
             messages = []
             
             for record in messages_result:
@@ -254,7 +254,8 @@ class EnhancedAvatarSystemManager:
                 self.stats["total_cost"] += results["total_cost"]
                 self.stats["last_analysis_date"] = datetime.now().isoformat()
                 
-                logger.info(f"Completed LLM analysis for {person_name}. Cost: ${results['total_cost']:.4f}")
+                cost_info = f"${results['total_cost']:.4f}"
+                logger.info(f"Completed LLM analysis for {person_name}. Cost: {cost_info}")
             else:
                 logger.info(f"LLM analysis disabled, creating basic profile for {person_name}")
             
@@ -479,13 +480,15 @@ class EnhancedAvatarSystemManager:
             prompt_parts = []
             
             # Base personality context
-            prompt_parts.append(f"You are role-playing as {person_data['name']}.")
+            name = person_data['name']
+            prompt_parts.append(f"You are role-playing as {name}.")
             
             # Add personality insights if available
             if person_data.get("personality_profile"):
                 pp = person_data["personality_profile"]
                 if pp.get('personality_insights'):
-                    prompt_parts.append(f"Personality: {' '.join(pp.get('personality_insights', []))}")
+                    insights_text = ' '.join(pp.get('personality_insights', []))
+                    prompt_parts.append(f"Personality: {insights_text}")
                 
                 # Add Big Five context
                 big_five = pp.get('big_five_scores', {})
@@ -502,16 +505,19 @@ class EnhancedAvatarSystemManager:
                     personality_desc.append("curious and open to new experiences")
                 
                 if personality_desc:
-                    prompt_parts.append(f"You are {', '.join(personality_desc)}.")
+                    desc_text = ', '.join(personality_desc)
+                    prompt_parts.append(f"You are {desc_text}.")
             
             # Add relationship context
             if partners and person_data.get("relationships"):
                 for partner in partners:
                     rel = person_data["relationships"].get(partner.lower())
                     if rel:
+                        rel_type = rel.get('relationship_type', 'friendly')
+                        comm_pattern = rel.get('communication_pattern', 'casual and friendly')
                         prompt_parts.append(
-                            f"Your relationship with {partner} is {rel.get('relationship_type', 'friendly')}. "
-                            f"Communication pattern: {rel.get('communication_pattern', 'casual and friendly')}."
+                            f"Your relationship with {partner} is {rel_type}. "
+                            f"Communication pattern: {comm_pattern}."
                         )
             
             # Add communication style
@@ -532,7 +538,8 @@ class EnhancedAvatarSystemManager:
                     style_desc.append("gentle and diplomatic")
                 
                 if style_desc:
-                    prompt_parts.append(f"Communication style: {', '.join(style_desc)}.")
+                    style_text = ', '.join(style_desc)
+                    prompt_parts.append(f"Communication style: {style_text}.")
             
             # Add topic-specific context
             if topic and person_data.get("topic_interests"):
@@ -554,9 +561,9 @@ class EnhancedAvatarSystemManager:
             if person_data.get("signature_phrases"):
                 common_phrases = person_data["signature_phrases"][:3]  # Top 3 phrases
                 if common_phrases:
-                    prompt_parts.append(
-                        f"You sometimes use expressions like: {', '.join([f'\"{phrase}\"' for phrase in common_phrases])}"
-                    )
+                    quoted_phrases = [f'"{phrase}"' for phrase in common_phrases]
+                    phrases_text = ', '.join(quoted_phrases)
+                    prompt_parts.append(f"You sometimes use expressions like: {phrases_text}")
             
             # Additional context
             if context:
@@ -689,7 +696,8 @@ class EnhancedAvatarSystemManager:
                     failed += 1
                 processed_results.append(result)
         
-        logger.info(f"Batch processing completed: {successful} successful, {failed} failed. Total cost: ${total_cost:.4f}")
+        cost_info = f"${total_cost:.4f}"
+        logger.info(f"Batch processing completed: {successful} successful, {failed} failed. Total cost: {cost_info}")
         
         return processed_results
     
