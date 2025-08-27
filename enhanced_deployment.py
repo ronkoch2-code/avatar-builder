@@ -111,7 +111,7 @@ class EnhancedSystemDeployment:
             """
             MERGE (sys:LLMSystem {id: 'avatar_llm_intelligence_v1'})
             SET sys.version = '1.0',
-                sys.supportedModels = ['claude-3-sonnet', 'claude-3-opus', 'claude-3-haiku'],
+                sys.supportedModels = ['claude-3-5-sonnet-20240620', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'],
                 sys.deploymentDate = datetime(),
                 sys.status = 'active',
                 sys.description = 'LLM-Enhanced Avatar Intelligence System'
