@@ -1,9 +1,14 @@
 #!/bin/bash
-# Make all scripts executable
+# Make all shell scripts executable
 
-chmod +x quick_fix.sh
-chmod +x deploy_with_fix.sh
-chmod +x prepare_git_push.sh
-chmod +x commit_model_update.sh
+echo "Setting execute permissions on all shell scripts..."
+chmod +x *.sh
+chmod +x enhanced_deployment.py
+chmod +x src/*.py
+chmod +x examples/*.py
+chmod +x test_enhanced_deployment.py
 
-echo "✓ All scripts are now executable"
+echo "✅ All scripts are now executable"
+echo ""
+echo "Available scripts:"
+ls -la *.sh | awk '{print "  " $9}'

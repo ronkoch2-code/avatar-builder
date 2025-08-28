@@ -1,0 +1,25 @@
+# Ignore backup files
+backups/
+*.backup
+*.bak
+
+# Ignore validation reports
+reports/
+*.report
+validation_report_*.json
+
+# Ignore temporary files
+*.tmp
+*.temp
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment files
+.env
+.env.local

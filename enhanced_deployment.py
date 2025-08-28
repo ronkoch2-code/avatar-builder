@@ -430,7 +430,7 @@ class EnhancedSystemDeployment:
             logger.info("Database connection closed")
 
 
-async def main():
+def main():
     """Main deployment script"""
     parser = argparse.ArgumentParser(description="Enhanced Avatar Intelligence System Deployment")
     
@@ -518,7 +518,15 @@ async def main():
         
         if args.analyze_person:
             print(f"🧠 Analyzing {args.analyze_person}...")
-            result = await deployment.analyze_person(args.analyze_person, args.force)
+            # Run async function in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(
+                    deployment.analyze_person(args.analyze_person, args.force)
+                )
+            finally:
+                loop.close()
             
             if result["status"] == "success":
                 print(f"✅ Analysis completed!")
@@ -532,10 +540,18 @@ async def main():
         
         if args.analyze_all:
             print(f"🧠 Analyzing up to {args.max_people} people...")
-            results = await deployment.analyze_all_people(
-                max_people=args.max_people,
-                force_reanalysis=args.force
-            )
+            # Run async function in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                results = loop.run_until_complete(
+                    deployment.analyze_all_people(
+                        max_people=args.max_people,
+                        force_reanalysis=args.force
+                    )
+                )
+            finally:
+                loop.close()
             
             successful = sum(1 for r in results if r.get("status") == "success")
             total_cost = sum(r.get("total_cost", 0) for r in results)
@@ -579,4 +595,11 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Set up logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Run main function
+    main()
