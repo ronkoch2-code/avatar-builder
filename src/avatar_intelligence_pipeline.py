@@ -602,6 +602,10 @@ class AvatarSystemManager:
                          partners: List[str] = None, topic: str = None) -> str:
         """Generate personalized AI avatar response prompt"""
         
+        # Debug logging to see what we're actually searching for
+        logger.info(f"Searching for person with identifier: '{person_identifier}' (length: {len(person_identifier)})")
+        logger.info(f"Identifier repr: {repr(person_identifier)}")
+        
         with self.driver.session() as session:
             # Get person's communication profile
             profile_query = """
@@ -783,6 +787,14 @@ def main():
     # Handle multi-word arguments
     person_name = ' '.join(args.person) if args.person else None
     topic_text = ' '.join(args.topic) if args.topic else None
+    
+    # Debug logging
+    if args.command == 'generate':
+        logger.info(f"Raw args.person: {args.person}")
+        logger.info(f"Processed person_name: '{person_name}'")
+        logger.info(f"Person name repr: {repr(person_name)}")
+        if args.partners:
+            logger.info(f"Raw args.partners: {args.partners}")
     
     try:
         if args.command == 'init-all':
