@@ -2,6 +2,31 @@
 
 This directory contains utility scripts for maintaining and managing the Avatar-Engine Neo4j database and related operations.
 
+## Quick Setup
+
+### First Time Setup
+If you haven't configured Neo4j yet, run the setup script:
+```bash
+python3 utilities/setup_neo4j.py
+```
+
+This will:
+- Create a `.env` file with your Neo4j credentials
+- Test the connection
+- Set up environment variables
+
+### Debugging Connection Issues
+If you're having authentication problems:
+```bash
+python3 utilities/debug_neo4j.py
+```
+
+This will show:
+- Current environment variables
+- Config file locations
+- Connection test results
+- Specific recommendations
+
 ## Available Utilities
 
 ### 1. reset_neo4j.py
@@ -94,10 +119,37 @@ python3 utilities/migrate_schema.py --rollback
 
 ## Configuration
 
-All utilities read configuration from:
-1. Environment variables (NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD)
-2. `~/.avatar-engine/avatar_config.json` (if exists)
-3. Command-line arguments (highest priority)
+All utilities read configuration from (in order of priority):
+1. Command-line arguments (highest priority)
+2. `.env` file in project root
+3. Environment variables (NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD)
+4. `~/.avatar-engine/avatar_config.json` (if exists)
+5. Default values
+
+### Setting Up Authentication
+
+**Method 1: Use the setup script (recommended)**
+```bash
+python3 utilities/setup_neo4j.py
+```
+
+**Method 2: Create .env file manually**
+```bash
+cp .env.example .env
+# Edit .env and add your Neo4j password
+```
+
+**Method 3: Export environment variables**
+```bash
+export NEO4J_PASSWORD='your_password'
+export NEO4J_URI='bolt://localhost:7687'
+export NEO4J_USERNAME='neo4j'
+```
+
+**Method 4: Pass as command-line arguments**
+```bash
+python3 utilities/reset_neo4j.py --password 'your_password' --uri 'bolt://localhost:7687'
+```
 
 ## Backup Directory
 

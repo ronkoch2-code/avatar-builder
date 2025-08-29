@@ -25,8 +25,43 @@ from neo4j.exceptions import ServiceUnavailable, AuthError
 import json
 import time
 
+# Configure logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
 # Add parent directory to path for module imports
 sys.path.append(str(Path(__file__).parent.parent))
+
+# Try to load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Try multiple locations for .env file
+    env_loaded = False
+    for env_path in [
+        Path.cwd() / ".env",
+        Path(__file__).parent.parent / ".env",
+        Path.home() / ".avatar-engine" / ".env"
+    ]:
+        if env_path.exists():
+            load_dotenv(env_path, override=True)  # Add override=True to force reload
+            env_loaded = True
+            logger.debug(f"Loaded .env from {env_path}")
+            # Debug: Check if password was loaded
+            test_password = os.getenv("NEO4J_PASSWORD")
+            if test_password:
+                logger.debug(f"Password loaded from .env: {len(test_password)} chars")
+            else:
+                logger.debug("Password NOT found after loading .env")
+            break
+    if not env_loaded:
+        load_dotenv(override=True)  # Try default location with override
+except ImportError:
+    logger.warning("python-dotenv not installed - .env file will not be loaded!")
+    logger.warning("Install it with: pip install python-dotenv")
 
 try:
     from src.config_manager import ConfigManager, Neo4jConfig
@@ -38,18 +73,14 @@ except ImportError:
             self.username = os.getenv("NEO4J_USERNAME", "neo4j")
             self.password = os.getenv("NEO4J_PASSWORD", "")
             self.database = os.getenv("NEO4J_DATABASE", "neo4j")
+            
+            # Debug logging
+            if not self.password:
+                logger.warning("NEO4J_PASSWORD not found in environment variables")
     
     class ConfigManager:
         def __init__(self):
             self.neo4j = Neo4jConfig()
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger(__name__)
 
 
 class Neo4jResetUtility:
@@ -103,6 +134,12 @@ class Neo4jResetUtility:
             "relationships_deleted": 0,
             "time_taken": 0
         }
+        
+        # Debug: Log config status
+        logger.debug(f"Config type: {type(self.config).__name__}")
+        logger.debug(f"Config has password: {bool(getattr(self.config, 'password', None))}")
+        if hasattr(self.config, 'password') and self.config.password:
+            logger.debug(f"Password length: {len(self.config.password)}")
     
     def connect(self) -> bool:
         """
@@ -111,7 +148,20 @@ class Neo4jResetUtility:
         Returns:
             True if connection successful, False otherwise
         """
+        # Check if password is set
+        if not self.config.password:
+            logger.error("❌ Neo4j password not set!")
+            logger.error("")
+            logger.error("Please set your Neo4j password using one of these methods:")
+            logger.error("1. Set environment variable: export NEO4J_PASSWORD='your_password'")
+            logger.error("2. Create .env file: echo 'NEO4J_PASSWORD=your_password' > .env")
+            logger.error("3. Pass as argument: --password your_password")
+            logger.error("")
+            logger.error("For debugging, run: python3 utilities/debug_neo4j.py")
+            return False
+            
         try:
+            logger.debug(f"Attempting connection to {self.config.uri} as {self.config.username}")
             self.driver = GraphDatabase.driver(
                 self.config.uri,
                 auth=(self.config.username, self.config.password)
@@ -120,16 +170,24 @@ class Neo4jResetUtility:
             with self.driver.session() as session:
                 result = session.run("RETURN 1 as test")
                 result.single()
-            logger.info(f"Successfully connected to Neo4j at {self.config.uri}")
+            logger.info(f"✅ Successfully connected to Neo4j at {self.config.uri}")
             return True
-        except AuthError:
-            logger.error("Authentication failed. Please check your Neo4j credentials.")
+        except AuthError as e:
+            logger.error(f"❌ Authentication failed for user '{self.config.username}'")
+            logger.error("   Please verify your Neo4j password is correct.")
+            logger.error(f"   Error details: {e}")
             return False
-        except ServiceUnavailable:
-            logger.error(f"Neo4j service unavailable at {self.config.uri}")
+        except ServiceUnavailable as e:
+            logger.error(f"❌ Neo4j service unavailable at {self.config.uri}")
+            logger.error("   Please check:")
+            logger.error("   1. Neo4j is running (neo4j status)")
+            logger.error("   2. The URI is correct (default: bolt://localhost:7687)")
+            logger.error("   3. Port 7687 is not blocked")
+            logger.error(f"   Error details: {e}")
             return False
         except Exception as e:
-            logger.error(f"Failed to connect to Neo4j: {e}")
+            logger.error(f"❌ Failed to connect to Neo4j: {e}")
+            logger.error("   Run 'python3 utilities/debug_neo4j.py' for detailed diagnostics")
             return False
     
     def disconnect(self):
@@ -469,17 +527,38 @@ Examples:
     # Set logging level
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Verbose mode enabled")
     
-    # Create config from arguments if provided
-    config = Neo4jConfig()
-    if args.uri:
-        config.uri = args.uri
-    if args.username:
-        config.username = args.username
-    if args.password:
-        config.password = args.password
-    if args.database:
-        config.database = args.database
+    # Create config - use existing ConfigManager if no args provided
+    if args.password or args.uri or args.username or args.database:
+        # Use command-line arguments
+        config = Neo4jConfig()
+        if args.uri:
+            config.uri = args.uri
+        if args.username:
+            config.username = args.username
+        if args.password:
+            config.password = args.password
+        if args.database:
+            config.database = args.database
+        logger.debug("Using command-line configuration")
+    else:
+        # Use ConfigManager or fallback Neo4jConfig (which reads from env)
+        try:
+            from src.config_manager import ConfigManager
+            config_manager = ConfigManager()
+            config = config_manager.neo4j
+            logger.debug("Using ConfigManager configuration")
+        except (ImportError, AttributeError):
+            config = Neo4jConfig()
+            logger.debug("Using fallback Neo4jConfig")
+    
+    # Debug: Log final config state
+    logger.debug(f"Final config - URI: {config.uri}")
+    logger.debug(f"Final config - Username: {config.username}")
+    logger.debug(f"Final config - Has password: {bool(config.password)}")
+    if config.password:
+        logger.debug(f"Final config - Password length: {len(config.password)}")
     
     # Confirmation prompt if not dry run
     if not args.dry_run:

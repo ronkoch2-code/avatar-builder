@@ -24,8 +24,36 @@ from typing import Optional, List, Dict, Any, Set, Tuple
 from neo4j import GraphDatabase
 from neo4j.exceptions import ServiceUnavailable, AuthError
 
+# Configure logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
 # Add parent directory to path for module imports
 sys.path.append(str(Path(__file__).parent.parent))
+
+# Try to load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Try multiple locations for .env file
+    env_loaded = False
+    for env_path in [
+        Path.cwd() / ".env",
+        Path(__file__).parent.parent / ".env",
+        Path.home() / ".avatar-engine" / ".env"
+    ]:
+        if env_path.exists():
+            load_dotenv(env_path)
+            env_loaded = True
+            logger.debug(f"Loaded .env from {env_path}")
+            break
+    if not env_loaded:
+        load_dotenv()  # Try default location
+except ImportError:
+    logger.debug("python-dotenv not installed, using system environment variables only")
 
 try:
     from src.config_manager import ConfigManager, Neo4jConfig
@@ -37,18 +65,14 @@ except ImportError:
             self.username = os.getenv("NEO4J_USERNAME", "neo4j")
             self.password = os.getenv("NEO4J_PASSWORD", "")
             self.database = os.getenv("NEO4J_DATABASE", "neo4j")
+            
+            # Debug logging
+            if not self.password:
+                logger.warning("NEO4J_PASSWORD not found in environment variables")
     
     class ConfigManager:
         def __init__(self):
             self.neo4j = Neo4jConfig()
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger(__name__)
 
 
 class Neo4jDataValidator:
@@ -106,7 +130,20 @@ class Neo4jDataValidator:
         Returns:
             True if connection successful, False otherwise
         """
+        # Check if password is set
+        if not self.config.password:
+            logger.error("❌ Neo4j password not set!")
+            logger.error("")
+            logger.error("Please set your Neo4j password using one of these methods:")
+            logger.error("1. Set environment variable: export NEO4J_PASSWORD='your_password'")
+            logger.error("2. Create .env file: echo 'NEO4J_PASSWORD=your_password' > .env")
+            logger.error("3. Pass as argument: --password your_password")
+            logger.error("")
+            logger.error("For debugging, run: python3 utilities/debug_neo4j.py")
+            return False
+            
         try:
+            logger.debug(f"Attempting connection to {self.config.uri} as {self.config.username}")
             self.driver = GraphDatabase.driver(
                 self.config.uri,
                 auth=(self.config.username, self.config.password)
@@ -115,16 +152,24 @@ class Neo4jDataValidator:
             with self.driver.session() as session:
                 result = session.run("RETURN 1 as test")
                 result.single()
-            logger.info(f"Successfully connected to Neo4j at {self.config.uri}")
+            logger.info(f"✅ Successfully connected to Neo4j at {self.config.uri}")
             return True
-        except AuthError:
-            logger.error("Authentication failed. Please check your Neo4j credentials.")
+        except AuthError as e:
+            logger.error(f"❌ Authentication failed for user '{self.config.username}'")
+            logger.error("   Please verify your Neo4j password is correct.")
+            logger.error(f"   Error details: {e}")
             return False
-        except ServiceUnavailable:
-            logger.error(f"Neo4j service unavailable at {self.config.uri}")
+        except ServiceUnavailable as e:
+            logger.error(f"❌ Neo4j service unavailable at {self.config.uri}")
+            logger.error("   Please check:")
+            logger.error("   1. Neo4j is running (neo4j status)")
+            logger.error("   2. The URI is correct (default: bolt://localhost:7687)")
+            logger.error("   3. Port 7687 is not blocked")
+            logger.error(f"   Error details: {e}")
             return False
         except Exception as e:
-            logger.error(f"Failed to connect to Neo4j: {e}")
+            logger.error(f"❌ Failed to connect to Neo4j: {e}")
+            logger.error("   Run 'python3 utilities/debug_neo4j.py' for detailed diagnostics")
             return False
     
     def disconnect(self):
