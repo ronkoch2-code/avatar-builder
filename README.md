@@ -1,117 +1,342 @@
-# Avatar-Engine Project Structure
+# Avatar-Engine
 
-## Overview
-Enhanced Avatar Intelligence System with LLM-powered personality analysis for iMessage conversations stored in Neo4j.
+**An intelligent system for analyzing conversation data and generating personalized AI avatars based on communication patterns.**
 
-## Directory Structure
+[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![Neo4j 5.0+](https://img.shields.io/badge/neo4j-5.0+-green.svg)](https://neo4j.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+## 🚀 Overview
+
+Avatar-Engine is a sophisticated conversation analysis system that:
+- **Loads message data** from various sources (SQLite, JSON) into Neo4j
+- **Analyzes communication patterns** using advanced NLP techniques
+- **Generates personality profiles** with optional LLM enhancement
+- **Creates AI avatars** that can respond in the authentic voice of analyzed individuals
+
+## 📋 Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Usage](#usage)
+- [Data Model](#data-model)
+- [API Reference](#api-reference)
+- [Contributing](#contributing)
+- [License](#license)
+
+## ✨ Features
+
+### Core Capabilities
+- **Message Data Loading**: Import conversations from SQLite databases or JSON files
+- **Intelligent Text Cleaning**: Remove binary artifacts and system metadata
+- **Graph-Based Storage**: Leverage Neo4j for relationship-aware data storage
+- **Pattern Detection**: Identify nicknames, signature phrases, and communication styles
+- **Relationship Analysis**: Infer relationship types (family, friend, romantic, professional)
+- **Personality Profiling**: Generate comprehensive communication profiles
+- **LLM Integration**: Optional Claude AI enhancement for deeper insights
+
+### Analysis Engines
+- **Nickname Detector**: Identifies how people address each other
+- **Relationship Inferrer**: Determines relationship types from conversation patterns
+- **Linguistic Analyzer**: Analyzes communication style, formality, and emotional expression
+- **Topic Analyzer**: Identifies preferred conversation topics
+- **Temporal Pattern Detector**: Discovers time-based communication patterns
+
+## 🛠️ Installation
+
+### Prerequisites
+
+1. **Python 3.7+**
+2. **Neo4j 5.0+** (Community or Enterprise Edition)
+3. **API Keys** (optional):
+   - Anthropic API key for Claude integration
+
+### Setup
+
+1. **Clone the repository**:
+```bash
+git clone https://github.com/yourusername/avatar-engine.git
+cd avatar-engine
+```
+
+2. **Install dependencies**:
+```bash
+pip install -r requirements.txt
+```
+
+3. **Configure Neo4j**:
+```bash
+# Interactive setup
+python3 utilities/setup_neo4j.py
+
+# Or manually create .env file
+echo "NEO4J_URI=bolt://localhost:7687" >> .env
+echo "NEO4J_USERNAME=neo4j" >> .env
+echo "NEO4J_PASSWORD=your_password" >> .env
+```
+
+4. **Initialize the database schema**:
+```bash
+python3 src/avatar_system_deployment.py deploy
+```
+
+## 🚀 Quick Start
+
+### 1. Load Your Message Data
+
+```bash
+# From SQLite database
+python3 src/message_data_loader.py /path/to/messages.db --password neo4j_password
+
+# From JSON file
+python3 src/message_data_loader.py /path/to/messages.json --password neo4j_password
+```
+
+### 2. Generate Avatar Profiles
+
+```bash
+# Initialize profiles for all people with 50+ messages
+python3 src/avatar_intelligence_pipeline.py \
+  --command init-all \
+  --min-messages 50 \
+  --password neo4j_password
+
+# Or initialize a specific person
+python3 src/avatar_intelligence_pipeline.py \
+  --command init-person \
+  --person "John Doe" \
+  --password neo4j_password
+```
+
+### 3. Generate Avatar Responses
+
+```bash
+# Generate an avatar prompt for a person
+python3 src/avatar_intelligence_pipeline.py \
+  --command generate \
+  --person "John Doe" \
+  --partners "Jane Smith" \
+  --topic "weekend plans" \
+  --password neo4j_password
+```
+
+## 🏗️ Architecture
+
 ```
 Avatar-Engine/
 │
-├── enhanced_deployment.py      # Main deployment and management script
-├── test_llm_fix.py             # Test script for LLM JSON parsing fix
+├── src/                              # Core source code
+│   ├── avatar_intelligence_pipeline.py   # Main analysis system
+│   ├── avatar_system_deployment.py       # Schema deployment
+│   ├── config_manager.py                 # Configuration management
+│   ├── enhanced_avatar_pipeline.py       # LLM-enhanced analysis
+│   ├── llm_integrator.py                 # Claude AI integration
+│   └── message_data_loader.py            # Data import pipeline
 │
-├── src/                        # Source code modules
-│   ├── config_manager.py       # Configuration and cost monitoring
-│   ├── enhanced_avatar_pipeline.py  # Main avatar system manager
-│   ├── llm_integrator.py       # LLM integration with Claude (FIXED)
-│   ├── llm_integrator_original.py  # Backup of original LLM integrator
-│   └── [other modules]
+├── utilities/                        # Database utilities
+│   ├── setup_neo4j.py               # Neo4j configuration
+│   ├── reset_neo4j.py               # Database reset tool
+│   ├── backup_neo4j.py              # Backup utility
+│   ├── validate_data.py             # Data validation
+│   └── debug_neo4j.py               # Debugging tools
 │
-├── docs/                       # Documentation
-│   └── llm_json_parsing_fix.md # Documentation of JSON parsing fix
+├── examples/                         # Usage examples
+│   ├── basic_usage.py               # Simple examples
+│   ├── enhanced_demo.py             # Advanced features
+│   └── test_system.py               # System tests
 │
-└── README.md                   # This file
+├── docs/                            # Documentation
+│   ├── message_data_loading.md     # Data loading guide
+│   ├── neo4j_data_model.md        # Database schema
+│   └── llm_json_parsing_fix.md    # Technical notes
+│
+├── sql/                             # Database schemas
+│   ├── avatar_intelligence_schema.cypher
+│   └── enhanced_avatar_schema.cypher
+│
+├── tests/                           # Test suite
+│   └── test_deployment.py
+│
+├── requirements.txt                 # Python dependencies
+├── setup.py                        # Package setup
+├── pyproject.toml                  # Modern Python packaging
+├── Makefile                        # Build automation
+└── CHANGELOG.md                    # Version history
 ```
 
-## Configuration
-Configuration stored in: `~/.avatar-engine/avatar_config.json`
+## 📊 Data Model
 
-### Required Configuration
-- **Neo4j**: Database connection settings
-- **Anthropic API**: API key and model selection
-- **Cost Limits**: Daily spending limits
-- **System Settings**: LLM analysis toggles
+The system uses a sophisticated Neo4j graph model with 19 node types and 17 relationship types:
 
-## Usage
+### Core Nodes
+- **Person**: Conversation participants
+- **Message**: Individual messages with cleaned text
+- **GroupChat**: Conversation groups
 
-### Basic Commands
+### Profile Nodes
+- **CommunicationProfile**: Main avatar profile
+- **PersonalityProfile**: LLM-generated analysis
+- **RelationshipPattern**: Dynamics with other people
+
+### Analysis Nodes
+- **SignaturePhrase**: Characteristic expressions
+- **EmotionalExpression**: Emotional patterns
+- **TopicPreference**: Preferred topics
+
+See [docs/neo4j_data_model.md](docs/neo4j_data_model.md) for complete details.
+
+## 💻 Usage
+
+### Python API
+
+```python
+from src.avatar_intelligence_pipeline import AvatarSystemManager
+from src.message_data_loader import MessageDataLoader
+from neo4j import GraphDatabase
+
+# Connect to Neo4j
+driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
+
+# Load message data
+loader = MessageDataLoader(neo4j_driver=driver)
+stats = loader.load_from_sqlite("/path/to/messages.db")
+print(f"Loaded {stats['messages_created']} messages")
+
+# Create avatar profiles
+avatar_system = AvatarSystemManager(driver)
+avatar_system.initialize_all_people(min_messages=50)
+
+# Generate avatar response
+prompt = avatar_system.generate_response(
+    person_identifier="John Doe",
+    conversation_type="1:1",
+    partners=["Jane Smith"],
+    topic="travel plans"
+)
+print(prompt)
+```
+
+### Command Line Interface
+
+All major components provide CLI interfaces:
+
 ```bash
-# Deploy enhanced schema
-python3 enhanced_deployment.py --deploy
+# System deployment and management
+python3 src/avatar_system_deployment.py --help
 
-# Check system status
-python3 enhanced_deployment.py --status
+# Message data loading
+python3 src/message_data_loader.py --help
 
-# List available people
-python3 enhanced_deployment.py --list-people
+# Avatar intelligence pipeline
+python3 src/avatar_intelligence_pipeline.py --help
 
-# Analyze specific person
-python3 enhanced_deployment.py --analyze-person "Person Name"
-
-# Analyze all people (with limit)
-python3 enhanced_deployment.py --analyze-all --max-people 5
-
-# Export profiles
-python3 enhanced_deployment.py --export
-
-# Show costs
-python3 enhanced_deployment.py --costs
+# Enhanced LLM analysis (requires Anthropic API key)
+python3 src/enhanced_avatar_pipeline.py --help
 ```
 
-### Testing
+### Neo4j Queries
+
+Query the graph directly using Cypher:
+
+```cypher
+// Find all people
+MATCH (p:Person)
+RETURN p.name, p.phone
+ORDER BY p.name
+
+// Get messages from a person
+MATCH (p:Person {name: "John Doe"})-[:SENT]->(m:Message)
+RETURN m.body, m.date
+ORDER BY m.date DESC
+LIMIT 100
+
+// Analyze relationships
+MATCH (p:Person)-[:HAS_PROFILE]->(cp:CommunicationProfile)
+MATCH (cp)-[:HAS_RELATIONSHIP]->(rp:RelationshipPattern)
+RETURN p.name, rp.partnerName, rp.relationshipType, rp.confidence
+```
+
+## 🔧 Utilities
+
+### Database Management
+
 ```bash
-# Run JSON parsing tests
-python3 test_llm_fix.py
+# Setup Neo4j configuration
+python3 utilities/setup_neo4j.py
+
+# Reset database (removes data, keeps schema)
+python3 utilities/reset_neo4j.py --dry-run  # Preview
+python3 utilities/reset_neo4j.py             # Execute
+
+# Backup database
+python3 utilities/backup_neo4j.py
+
+# Validate data integrity
+python3 utilities/validate_data.py
+
+# Debug connection issues
+python3 utilities/debug_neo4j.py
 ```
 
-## Key Features
-- **Personality Profiling**: Big Five personality analysis
-- **Relationship Dynamics**: Analyze communication patterns between people
-- **Communication Style**: Formality, directness, emotional expression
-- **Cost Monitoring**: Track API usage and costs
-- **Batch Processing**: Analyze multiple people efficiently
-- **Error Recovery**: Robust JSON parsing and error handling
+## 📚 Documentation
 
-## Recent Updates
-- **2025-08-27**: Fixed LLM JSON parsing issue
-  - Added robust JSON extraction from various response formats
-  - Enhanced prompt engineering for JSON-only responses
-  - Improved error handling and logging
+- **[Message Data Loading Guide](docs/message_data_loading.md)** - How to import your data
+- **[Neo4j Data Model](docs/neo4j_data_model.md)** - Complete schema documentation
+- **[Quick Start Guide](QUICKSTART.md)** - Get running quickly
+- **[Change Log](CHANGELOG.md)** - Version history and updates
 
-## Dependencies
-- `neo4j`: Graph database driver
-- `anthropic`: Claude API client
-- `pydantic`: Data validation
-- `pandas`: Data processing
-- `tenacity`: Retry logic
-- Standard library: asyncio, json, logging, etc.
+## 🧪 Testing
 
-## Troubleshooting
+Run the test suite:
 
-### JSON Parsing Errors
-See `docs/llm_json_parsing_fix.md` for details on the fix.
+```bash
+# All tests
+python3 run_tests.py
 
-### Rate Limiting (429 errors)
-- Reduce `max_concurrent` in LLM integrator
-- Add delays between requests
-- Monitor daily usage against limits
+# Specific test
+python3 tests/test_deployment.py
 
-### Cost Management
-- Set daily cost limits in configuration
-- Use `--max-people` flag to limit batch processing
-- Check costs regularly with `--costs` flag
+# Example scripts
+python3 examples/test_system.py
+```
 
-## Backup and Recovery
-- Original code backed up with `_original` suffix
-- Configuration backed up in `~/.avatar-engine/`
-- Neo4j data persisted in database
+## 🤝 Contributing
 
-## Future Enhancements
-- [ ] Web interface for profile viewing
-- [ ] Real-time message processing
-- [ ] Advanced visualization of relationships
-- [ ] Export to various formats (PDF, HTML)
-- [ ] Integration with other messaging platforms
+Contributions are welcome! Please:
 
-## Contact
-For issues or questions, refer to documentation in `/docs` directory.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Neo4j](https://neo4j.com/) graph database
+- LLM integration powered by [Anthropic's Claude](https://www.anthropic.com/)
+- Inspired by the need for authentic AI conversation partners
+
+## ⚠️ Privacy Notice
+
+This system processes and stores conversation data. Please ensure you:
+- Have consent to analyze conversations
+- Comply with relevant privacy laws
+- Secure your Neo4j database appropriately
+- Use encryption for sensitive data
+
+## 📧 Support
+
+For issues, questions, or suggestions:
+- Open an [issue](https://github.com/yourusername/avatar-engine/issues)
+- Check the [documentation](docs/)
+- Review the [examples](examples/)
+
+---
+
+**Avatar-Engine** - *Bringing authentic AI personalities to life through conversation analysis*
