@@ -163,13 +163,41 @@ class TestConfigManager(unittest.TestCase):
 class TestSecureDatabase(unittest.TestCase):
     """Test secure database wrapper"""
     
+    @patch('src.secure_database.ConfigManager')
+    @patch('src.secure_database.SecurityManager')
+    @patch('src.secure_database.SecureLogger')
     @patch('src.secure_database.GraphDatabase')
-    def setUp(self, mock_gdb):
+    def setUp(self, mock_gdb, mock_secure_logger, mock_security_manager, mock_config_manager):
         from src.secure_database import SecureNeo4jConnection
         
         # Mock driver
         self.mock_driver = MagicMock()
         mock_gdb.driver.return_value = self.mock_driver
+        
+        # Mock session for test connection
+        mock_session = MagicMock()
+        mock_result = MagicMock()
+        mock_result.single.return_value = {'test': 1}
+        mock_session.run.return_value = mock_result
+        self.mock_driver.session.return_value.__enter__ = Mock(return_value=mock_session)
+        self.mock_driver.session.return_value.__exit__ = Mock(return_value=None)
+        
+        # Mock config manager
+        mock_config_instance = MagicMock()
+        mock_config_instance.get_secure_neo4j_config.return_value = {
+            'uri': 'bolt://localhost:7687',
+            'auth': ('neo4j', 'password'),
+            'database': 'neo4j',
+            'encrypted': True,
+            'trust': 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES'
+        }
+        mock_config_manager.return_value = mock_config_instance
+        
+        # Mock security manager
+        mock_security_manager.return_value = MagicMock()
+        
+        # Mock secure logger
+        mock_secure_logger.return_value = MagicMock()
         
         # Create connection
         self.db = SecureNeo4jConnection()
@@ -209,21 +237,18 @@ class TestSecureDatabase(unittest.TestCase):
                 'user$id': 'test',  # Invalid: contains $
             })
     
-    @patch('src.secure_database.GraphDatabase')
-    def test_parameterized_queries(self, mock_gdb):
+    def test_parameterized_queries(self):
         """Test that queries use parameters correctly"""
-        from src.secure_database import SecureNeo4jConnection
-        
-        # Setup mock
+        # Setup mock session for execute_query
         mock_session = MagicMock()
-        mock_driver = MagicMock()
-        mock_driver.session.return_value.__enter__ = Mock(return_value=mock_session)
-        mock_driver.session.return_value.__exit__ = Mock(return_value=None)
-        mock_gdb.driver.return_value = mock_driver
+        mock_result = MagicMock()
+        mock_result.__iter__ = Mock(return_value=iter([]))  # Empty results
+        mock_session.run.return_value = mock_result
+        self.mock_driver.session.return_value.__enter__ = Mock(return_value=mock_session)
+        self.mock_driver.session.return_value.__exit__ = Mock(return_value=None)
         
-        # Create connection and execute query
-        db = SecureNeo4jConnection()
-        db.execute_query(
+        # Execute query with injection attempt
+        self.db.execute_query(
             "MATCH (p:Person {name: $name}) RETURN p",
             {"name": "John'; DROP DATABASE neo4j; --"}
         )

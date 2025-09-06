@@ -50,12 +50,15 @@ class SecureNeo4jConnection:
             config: ConfigManager instance
             **kwargs: Additional connection parameters
         """
-        self.config = config or ConfigManager()
+        self.config = config or (ConfigManager() if ConfigManager else None)
         self.security_manager = SecurityManager() if SecurityManager else None
         self.secure_logger = SecureLogger("database") if SecureLogger else None
         
         # Get secure connection configuration
-        conn_config = self.config.get_secure_neo4j_config() if hasattr(self.config, 'get_secure_neo4j_config') else self._get_default_config()
+        if self.config and hasattr(self.config, 'get_secure_neo4j_config'):
+            conn_config = self.config.get_secure_neo4j_config()
+        else:
+            conn_config = self._get_default_config()
         conn_config.update(kwargs)
         
         # Initialize driver with secure settings
@@ -80,12 +83,24 @@ class SecureNeo4jConnection:
     def _get_default_config(self) -> Dict[str, Any]:
         """Get default configuration if ConfigManager not available"""
         import os
+        
+        # Require password to be explicitly set - no defaults
+        password = os.getenv('NEO4J_PASSWORD')
+        if not password:
+            raise ValueError(
+                "NEO4J_PASSWORD environment variable must be set. "
+                "Please set secure database credentials before running."
+            )
+        
+        username = os.getenv('NEO4J_USERNAME')
+        if not username:
+            raise ValueError(
+                "NEO4J_USERNAME environment variable must be set."
+            )
+        
         return {
             'uri': os.getenv('NEO4J_URI', 'bolt://localhost:7687'),
-            'auth': (
-                os.getenv('NEO4J_USERNAME', 'neo4j'),
-                os.getenv('NEO4J_PASSWORD', '')
-            ),
+            'auth': (username, password),
             'database': os.getenv('NEO4J_DATABASE', 'neo4j'),
             'encrypted': True,
             'trust': 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES'
