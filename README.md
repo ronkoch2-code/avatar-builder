@@ -44,6 +44,15 @@ Avatar-Engine is a sophisticated conversation analysis system that:
 - **Topic Analyzer**: Identifies preferred conversation topics
 - **Temporal Pattern Detector**: Discovers time-based communication patterns
 
+### Small Language Models (SLM) - Mac Metal Optimized
+- **Personalized Training**: Train custom language models from conversation data
+- **Metal Acceleration**: Leverages Apple Silicon for efficient training and inference
+- **MLX Framework**: Optimized for M1/M2/M3 processors
+- **Local Inference**: Run avatar models locally without cloud dependencies
+- **Interactive Chat**: Real-time conversation with trained avatars
+- **Streaming Generation**: Low-latency response streaming
+- **Batch Processing**: Efficient multi-prompt processing
+
 ## 🛠️ Installation
 
 ### Prerequisites
@@ -64,6 +73,9 @@ cd avatar-engine
 2. **Install dependencies**:
 ```bash
 pip install -r requirements.txt
+
+# For Mac Metal SLM support (Apple Silicon only):
+pip install mlx mlx-lm
 ```
 
 3. **Configure Neo4j**:
@@ -121,6 +133,27 @@ python3 src/avatar_intelligence_pipeline.py \
   --topic "weekend plans" \
   --password neo4j_password
 ```
+
+### 4. Train Small Language Models (Mac Only)
+
+```bash
+# Full pipeline: Extract, Train, and Chat
+python3 examples/slm/slm_pipeline_example.py full --person "John Doe"
+
+# Or run individual steps:
+# Extract conversation data
+python3 examples/slm/slm_pipeline_example.py extract --person "John Doe"
+
+# Train personalized model
+python3 examples/slm/slm_pipeline_example.py train \
+  --data-path data/extracted/john_doe.jsonl
+
+# Start interactive chat
+python3 examples/slm/slm_pipeline_example.py chat \
+  --model-path models/john_avatar
+```
+
+For detailed SLM documentation, see [docs/slm/slm_documentation.md](docs/slm/slm_documentation.md)
 
 ## 🏗️ Architecture
 
