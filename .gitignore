@@ -73,6 +73,10 @@ venv.bak/
 *.tmp
 *.temp
 
+# Temporary git scripts directory
+git-hub-script/
+git-hub-scripts/
+
 # Database backups and reports
 utilities/backups/
 utilities/reports/

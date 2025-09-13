@@ -7,6 +7,10 @@ numpy>=1.21.0
 python-dateutil>=2.8.0
 regex>=2022.0.0
 
+# Security dependencies (Phase 1)
+cryptography>=41.0.7             # For data encryption
+python-dotenv>=1.0.0             # Secure environment variable management
+
 # LLM Integration (new)
 anthropic>=0.34.0                # Claude API client
 openai>=1.0.0                    # Optional OpenAI integration

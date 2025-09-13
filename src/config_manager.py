@@ -4,39 +4,64 @@ Configuration Manager for Enhanced Avatar Intelligence System
 ==========================================================
 
 Centralized configuration management for LLM integration,
-database connections, and system settings.
+database connections, and system settings with enhanced security.
+
+Security Features:
+- Secure API key management
+- Encrypted sensitive configuration
+- Validation of configuration values
+- Audit logging for configuration access
 """
 
 import os
 import json
 import logging
+import hashlib
 from pathlib import Path
-from typing import Dict, Any, Optional
-from dataclasses import dataclass, asdict
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass, asdict, field
 from dotenv import load_dotenv
 from datetime import datetime
+import warnings
 
 # Load environment variables
 load_dotenv()
+
+# Import security utilities
+try:
+    from .security_utils import SecurityManager, SecureLogger
+except ImportError:
+    # Fallback if security utils not available yet
+    SecurityManager = None
+    SecureLogger = None
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class Neo4jConfig:
-    """Neo4j database configuration"""
+    """Neo4j database configuration with security enhancements"""
     uri: str = "bolt://localhost:7687"
     username: str = "neo4j"
-    password: str = ""
+    password: str = field(default="", repr=False)  # Hide password in repr
     database: str = "neo4j"
     max_connection_pool_size: int = 50
     connection_timeout: float = 30.0
+    encrypted: bool = True  # Use TLS by default
+    trust: str = "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES"
+    
+    def __post_init__(self):
+        """Validate configuration after initialization"""
+        if not self.password:
+            raise ValueError("Neo4j password cannot be empty")
+        if not self.uri.startswith(('bolt://', 'neo4j://', 'neo4j+s://')):
+            raise ValueError(f"Invalid Neo4j URI scheme: {self.uri}")
 
 
 @dataclass
 class AnthropicConfig:
-    """Anthropic/Claude configuration"""
-    api_key: str = ""
+    """Anthropic/Claude configuration with secure API key handling"""
+    api_key: str = field(default="", repr=False)  # Hide API key in repr
     model: str = "claude-sonnet-4-20250514"
     max_tokens: int = 4000
     temperature: float = 0.1
@@ -46,6 +71,20 @@ class AnthropicConfig:
     # Cost management
     daily_cost_limit: float = 50.0  # Daily spending limit in USD
     cost_alert_threshold: float = 20.0  # Alert when approaching limit
+    
+    # Security settings
+    validate_responses: bool = True  # Validate LLM responses for safety
+    log_api_calls: bool = True  # Log API calls (without sensitive data)
+    
+    def __post_init__(self):
+        """Validate API key format"""
+        if self.api_key and not self._is_valid_api_key(self.api_key):
+            raise ValueError("Invalid Anthropic API key format")
+    
+    def _is_valid_api_key(self, key: str) -> bool:
+        """Basic validation of API key format"""
+        # Anthropic keys typically start with 'sk-' and have specific length
+        return key.startswith('sk-') and len(key) > 40
 
 
 @dataclass
@@ -150,19 +189,87 @@ class ConfigManager:
                     setattr(self.system, key, value)
     
     def _load_from_env(self):
-        """Load configuration from environment variables"""
+        """Load configuration from environment variables with security warnings"""
         # Neo4j
         self.neo4j.uri = os.getenv("NEO4J_URI", self.neo4j.uri)
         self.neo4j.username = os.getenv("NEO4J_USERNAME", self.neo4j.username)
-        self.neo4j.password = os.getenv("NEO4J_PASSWORD", self.neo4j.password)
+        
+        # Secure password loading
+        password = os.getenv("NEO4J_PASSWORD", "")
+        if password:
+            self.neo4j.password = password
+        else:
+            logger.warning("Neo4j password not found in environment variables")
+        
         self.neo4j.database = os.getenv("NEO4J_DATABASE", self.neo4j.database)
         
-        # Anthropic
-        self.anthropic.api_key = os.getenv("ANTHROPIC_API_KEY", self.anthropic.api_key)
+        # Anthropic - Secure API key loading
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        if api_key:
+            self.anthropic.api_key = api_key
+        else:
+            logger.warning("Anthropic API key not found in environment variables")
+        
+        # Security validation
+        self._validate_sensitive_config()
         self.anthropic.model = os.getenv("CLAUDE_MODEL", self.anthropic.model)
         
         # System
         self.system.log_level = os.getenv("LOG_LEVEL", self.system.log_level)
+    
+    def _validate_sensitive_config(self):
+        """Validate sensitive configuration with security checks"""
+        # Check for hardcoded credentials (development warning)
+        if self.neo4j.password and self.neo4j.password in ['password', 'neo4j', 'admin', '123456']:
+            warnings.warn("Weak Neo4j password detected! Use a strong password in production.", SecurityWarning)
+        
+        if self.anthropic.api_key and 'test' in self.anthropic.api_key.lower():
+            warnings.warn("Test API key detected! Use production key for real usage.", SecurityWarning)
+    
+    def validate_config(self):
+        """Validate configuration settings with security checks"""
+        # Check for required settings
+        if not self.neo4j.password:
+            logger.error("No Neo4j password configured - database connection will fail")
+            raise ValueError("Neo4j password is required")
+        
+        if not self.anthropic.api_key:
+            logger.warning("No Anthropic API key configured - LLM features disabled")
+            self.system.enable_llm_analysis = False
+        
+        # Validate URLs
+        if not self.neo4j.uri.startswith(('bolt://', 'neo4j://', 'neo4j+s://')):
+            raise ValueError(f"Invalid Neo4j URI: {self.neo4j.uri}")
+        
+        # Security validation
+        self._validate_sensitive_config()
+    
+    def get_secure_neo4j_config(self) -> Dict[str, Any]:
+        """Get Neo4j configuration with secure handling"""
+        return {
+            'uri': self.neo4j.uri,
+            'auth': (self.neo4j.username, self.neo4j.password),
+            'database': self.neo4j.database,
+            'encrypted': self.neo4j.encrypted,
+            'trust': self.neo4j.trust,
+            'max_connection_pool_size': self.neo4j.max_connection_pool_size,
+            'connection_timeout': self.neo4j.connection_timeout
+        }
+    
+    def get_secure_anthropic_key(self) -> str:
+        """Get Anthropic API key with validation"""
+        if not self.anthropic.api_key:
+            raise ValueError("Anthropic API key not configured")
+        
+        # Log access (without revealing key)
+        if SecureLogger:
+            secure_logger = SecureLogger("config_access")
+            secure_logger.log_event("api_key_access", {
+                "service": "anthropic",
+                "timestamp": datetime.now().isoformat()
+            })
+        
+        return self.anthropic.api_key
         
         # Parse numeric environment variables
         try:

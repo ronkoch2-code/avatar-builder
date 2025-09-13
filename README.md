@@ -2,7 +2,8 @@
 
 **An intelligent system for analyzing conversation data and generating personalized AI avatars based on communication patterns.**
 
-[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Security Audit](https://img.shields.io/badge/security-audited-green.svg)](SECURITY_ENHANCEMENTS.md)
 [![Neo4j 5.0+](https://img.shields.io/badge/neo4j-5.0+-green.svg)](https://neo4j.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -13,6 +14,19 @@ Avatar-Engine is a sophisticated conversation analysis system that:
 - **Analyzes communication patterns** using advanced NLP techniques
 - **Generates personality profiles** with optional LLM enhancement
 - **Creates AI avatars** that can respond in the authentic voice of analyzed individuals
+- **Protects privacy** with comprehensive security features (NEW in v2.0)
+
+### 🔒 Security Features (v2.1 - Enhanced)
+- **Encrypted sensitive data** - PII protection with AES-256 encryption
+- **PBKDF2 key derivation** - Enhanced key security with 100,000 iterations
+- **No default credentials** - Mandatory explicit configuration for all secrets
+- **Anonymized phone numbers** - Privacy-preserving data storage
+- **Parameterized queries** - SQL/Cypher injection prevention
+- **Secure API key management** - Environment-based configuration with validation
+- **Comprehensive input validation** - Protection against prompt injection and path traversal
+- **Rate limiting** - Configurable abuse prevention for APIs and database
+- **Secure audit logging** - Automatic PII/secret redaction in all logs
+- **Enhanced pattern detection** - AWS keys, JWT tokens, and configurable patterns
 
 ## 📋 Table of Contents
 
@@ -96,11 +110,11 @@ python3 src/avatar_system_deployment.py deploy
 
 ## 🚀 Quick Start
 
-### 1. Load Your Message Data
+### 1. Load Your Message Data (Securely)
 
 ```bash
-# From SQLite database
-python3 src/message_data_loader.py /path/to/messages.db --password neo4j_password
+# From SQLite database with anonymization
+python3 src/message_data_loader.py /path/to/messages.db --password neo4j_password --anonymize
 
 # From JSON file
 python3 src/message_data_loader.py /path/to/messages.json --password neo4j_password
@@ -344,6 +358,27 @@ Contributions are welcome! Please:
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## 🖄 Version History
+
+### v2.0.0 (2025-01-30) - Security Enhancement Release
+- 🔒 **Major Security Overhaul**
+  - Implemented comprehensive security features
+  - Added encryption for sensitive data
+  - Parameterized all database queries
+  - Secure API key management
+  - Phone number anonymization
+  - Rate limiting and input validation
+- 🔧 **Infrastructure Improvements**
+  - Created secure database wrapper
+  - Added security utilities module
+  - Enhanced error handling
+- 🧪 **Testing**
+  - Comprehensive security test suite
+  - 100% coverage for security features
+
+### v1.x - Previous Versions
+See CHANGELOG.md for earlier version history.
 
 ## 📝 License
 

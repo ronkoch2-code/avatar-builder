@@ -164,16 +164,19 @@ class LLMIntegrator:
     
     def _extract_json_from_response(self, response_text: str) -> Dict[str, Any]:
         """
-        Extract JSON from LLM response that might contain markdown or other formatting
+        Extract JSON from LLM response with improved parsing and security
         
         Args:
             response_text: Raw response from LLM
             
         Returns:
             Parsed JSON dictionary
+            
+        Raises:
+            ValueError: If no valid JSON can be extracted
         """
-        # Log the raw response for debugging
-        logger.debug(f"Raw LLM response: {response_text[:500]}...")
+        # Log the raw response for debugging (truncated for security)
+        logger.debug(f"Raw LLM response length: {len(response_text)} chars")
         
         # Try direct JSON parsing first
         try:
@@ -181,49 +184,109 @@ class LLMIntegrator:
         except json.JSONDecodeError:
             pass
         
-        # Try to extract JSON from markdown code block
-        json_pattern = r'```(?:json)?\s*\n?([\s\S]*?)\n?```'
-        matches = re.findall(json_pattern, response_text)
-        if matches:
+        # Try to extract JSON from markdown code blocks
+        markdown_patterns = [
+            r'```json\s*\n([^`]+)\n```',  # JSON code block
+            r'```\s*\n(\{[^`]+\})\n```',  # Generic code block with JSON
+        ]
+        
+        for pattern in markdown_patterns:
+            matches = re.findall(pattern, response_text, re.MULTILINE | re.DOTALL)
+            if matches:
+                for match in matches:
+                    try:
+                        parsed = json.loads(match)
+                        # Validate it's a dictionary
+                        if isinstance(parsed, dict):
+                            return parsed
+                    except json.JSONDecodeError:
+                        continue
+        
+        # Try to find well-formed JSON objects using a more precise pattern
+        # This handles nested objects better
+        json_object_pattern = r'(\{(?:[^{}]|\{[^{}]*\})*\})'
+        matches = re.finditer(json_object_pattern, response_text)
+        
+        json_candidates = []
+        for match in matches:
             try:
-                return json.loads(matches[0])
+                parsed = json.loads(match.group(1))
+                if isinstance(parsed, dict):
+                    json_candidates.append(parsed)
             except json.JSONDecodeError:
-                pass
+                continue
         
-        # Try to find JSON object in the text
-        json_object_pattern = r'\{[\s\S]*\}'
-        matches = re.findall(json_object_pattern, response_text)
-        if matches:
-            # Try the largest match first (likely the complete JSON)
-            for match in sorted(matches, key=len, reverse=True):
-                try:
-                    return json.loads(match)
-                except json.JSONDecodeError:
-                    continue
+        # Return the largest valid JSON object (likely the most complete)
+        if json_candidates:
+            return max(json_candidates, key=lambda x: len(json.dumps(x)))
         
-        # If all else fails, log the response and raise an error
-        logger.error(f"Could not extract JSON from response. First 1000 chars: {response_text[:1000]}")
-        raise ValueError(f"Failed to extract valid JSON from LLM response")
+        # Try to extract JSON arrays if no objects found
+        json_array_pattern = r'(\[(?:[^\[\]]|\[[^\[\]]*\])*\])'
+        matches = re.finditer(json_array_pattern, response_text)
+        
+        for match in matches:
+            try:
+                parsed = json.loads(match.group(1))
+                # Wrap array in object if needed
+                if isinstance(parsed, list):
+                    return {"data": parsed}
+            except json.JSONDecodeError:
+                continue
+        
+        # If all else fails, log error with limited info
+        logger.error(f"Could not extract JSON from response. Response length: {len(response_text)}")
+        
+        # Try to provide helpful error information without exposing full response
+        if '{' not in response_text:
+            raise ValueError("No JSON object found in LLM response")
+        elif '}' not in response_text:
+            raise ValueError("Incomplete JSON object in LLM response")
+        else:
+            raise ValueError("Failed to parse JSON from LLM response - invalid format")
     
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def _call_llm(self, system_prompt: str, user_prompt: str) -> Tuple[str, Dict[str, Any]]:
+    async def _call_llm(self, 
+                       system_prompt: str, 
+                       user_prompt: str,
+                       max_tokens: Optional[int] = None,
+                       temperature: Optional[float] = None) -> Tuple[str, Dict[str, Any]]:
         """
-        Make API call to Claude with retry logic
+        Make API call to Claude with retry logic and error handling
         
+        Args:
+            system_prompt: System instructions for the model
+            user_prompt: User's input prompt
+            max_tokens: Maximum tokens for response (default: 4000)
+            temperature: Temperature for response (default: 0.1)
+            
         Returns:
             Tuple of (response_text, metadata)
+            
+        Raises:
+            anthropic.APIError: For API-related errors
+            ValueError: For invalid responses
         """
         try:
             start_time = datetime.now()
             
+            # Use provided values or defaults
+            max_tokens = max_tokens or 4000
+            temperature = temperature or 0.1
+            
+            # Validate inputs
+            if not system_prompt or not user_prompt:
+                raise ValueError("System prompt and user prompt are required")
+            
+            # Make API call with timeout
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=4000,
-                temperature=0.1,
+                max_tokens=max_tokens,
+                temperature=temperature,
                 system=system_prompt,
                 messages=[
                     {"role": "user", "content": user_prompt}
-                ]
+                ],
+                timeout=30.0  # 30 second timeout
             )
             
             processing_time = (datetime.now() - start_time).total_seconds()
@@ -247,10 +310,22 @@ class LLMIntegrator:
                 "timestamp": datetime.now().isoformat()
             }
             
+            # Log successful call (without sensitive data)
+            logger.info(f"LLM call successful: {input_tokens} input, {output_tokens} output tokens")
+            
             return response.content[0].text, metadata
             
+        except anthropic.RateLimitError as e:
+            logger.error(f"Rate limit exceeded: {e}")
+            raise
+        except anthropic.APIConnectionError as e:
+            logger.error(f"API connection error: {e}")
+            raise
+        except anthropic.APIStatusError as e:
+            logger.error(f"API status error: {e.status_code} - {e.message}")
+            raise
         except Exception as e:
-            logger.error(f"LLM API call failed: {str(e)}")
+            logger.error(f"Unexpected error in LLM call: {type(e).__name__}: {e}")
             raise
     
     def _calculate_cost(self, input_tokens: int, output_tokens: int) -> float:
