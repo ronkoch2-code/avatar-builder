@@ -1,197 +1,89 @@
 # Avatar-Engine Utilities
 
-This directory contains utility scripts for maintaining and managing the Avatar-Engine Neo4j database and related operations.
+This directory contains utility scripts and tools for the Avatar-Engine project.
 
-## Quick Setup
+## Directory Structure
 
-### First Time Setup
-If you haven't configured Neo4j yet, run the setup script:
+### Main Utilities (./utilities/)
+- **generate_secure_env.py** - Generates secure environment configuration with encryption keys
+- **audit_code_completeness.py** - Audits code for completeness, finding TODOs and incomplete implementations
+- **run_extractor.py** - Main runner script for the iMessage extraction pipeline
+- **run_with_local_storage.py** - NAS workaround runner that uses local temp storage for SQLite operations
+- **backup_neo4j.py** - Backs up Neo4j database
+- **reset_neo4j.py** - Resets Neo4j database to clean state
+- **setup_neo4j.py** - Sets up Neo4j database with schema
+- **validate_data.py** - Validates data integrity
+- **organize_project_files.py** - Organizes project files
+
+### Debug Tools (./debug/)
+Contains test scripts and debugging tools used during development:
+- Test scripts (test_*.py) - Various test utilities for different components
+- Debug scripts (debug_*.py) - Debugging tools for environment and configuration
+- Verify scripts (verify_*.py) - Verification tools for fixes and configurations
+- Run scripts (run_*.py) - Test runners and configuration testers
+
+### Archived Fixes (./archived_fixes/)
+Contains historical fix scripts from various debugging sessions:
+- Fix scripts (fix_*.py) - Scripts that fixed specific issues
+- Apply scripts (apply_*.py) - Scripts that applied fixes
+- Restore scripts (restore_*.py) - Scripts that restored functionality
+- Workaround scripts - Various workarounds for specific issues
+
+### SLM Tools (./slm/)
+Structured Local Memory (SLM) management tools:
+- **add_slm_to_git.py** - Adds SLM files to git
+- **complete_slm_git_integration.py** - Completes SLM git integration
+- **quick_add_slm.py** - Quick script to add SLM files
+- **analyze_organization.py** - Analyzes project organization
+- **final_prep_repository.py** - Final repository preparation
+
+### Diagnostic Scripts (../diagnostic_scripts/)
+Comprehensive diagnostic tools:
+- **diagnose_extractor.py** - Diagnoses extractor issues
+- **diagnose_pipeline_issue.py** - Diagnoses pipeline problems
+- **diagnose_sqlite_*.py** - SQLite-specific diagnostics
+- **diagnose_macos_security.py** - macOS security diagnostics
+- **diagnose_copy_methods.py** - File copy method diagnostics
+- **diagnose_query_failure.py** - Query failure diagnostics
+
+## Usage
+
+### Running the Extraction Pipeline
 ```bash
+# Standard extraction
+python3 utilities/run_extractor.py
+
+# With NAS workaround (uses local temp storage)
+python3 utilities/run_with_local_storage.py
+```
+
+### Environment Setup
+```bash
+# Generate secure environment configuration
+python3 utilities/generate_secure_env.py
+```
+
+### Code Auditing
+```bash
+# Audit code for completeness
+python3 utilities/audit_code_completeness.py
+```
+
+### Neo4j Management
+```bash
+# Setup Neo4j
 python3 utilities/setup_neo4j.py
-```
 
-This will:
-- Create a `.env` file with your Neo4j credentials
-- Test the connection
-- Set up environment variables
-
-### Debugging Connection Issues
-If you're having authentication problems:
-```bash
-python3 utilities/debug_neo4j.py
-```
-
-This will show:
-- Current environment variables
-- Config file locations
-- Connection test results
-- Specific recommendations
-
-## Available Utilities
-
-### 1. reset_neo4j.py
-**Purpose:** Safely reset the Neo4j database while preserving schema
-
-**Features:**
-- Deletes all data nodes (Person, Message, Profile, etc.)
-- Preserves database schema (constraints and indexes)
-- Preserves system metadata nodes
-- Creates backup statistics before reset
-- Supports dry-run mode for safety
-
-**Usage:**
-```bash
-# Dry run - see what would be deleted
-python3 utilities/reset_neo4j.py --dry-run
-
-# Reset with automatic backup
-python3 utilities/reset_neo4j.py
-
-# Reset without backup (use carefully!)
-python3 utilities/reset_neo4j.py --no-backup
-
-# Custom Neo4j connection
-python3 utilities/reset_neo4j.py --uri bolt://localhost:7687 --username neo4j --password mypass
-```
-
-### 2. backup_neo4j.py
-**Purpose:** Create comprehensive backups of Neo4j data
-
-**Features:**
-- Export all nodes and relationships to JSON
-- Timestamped backup files
-- Compression support
-- Selective backup by node types
-
-**Usage:**
-```bash
-# Full backup
+# Backup Neo4j
 python3 utilities/backup_neo4j.py
 
-# Backup specific node types
-python3 utilities/backup_neo4j.py --nodes Person Message
-
-# Compressed backup
-python3 utilities/backup_neo4j.py --compress
+# Reset Neo4j
+python3 utilities/reset_neo4j.py
 ```
 
-### 3. validate_data.py
-**Purpose:** Validate data integrity in Neo4j database
+## Notes
+- Debug and archived_fixes directories contain historical scripts for reference
+- Most active utilities are in the main utilities directory
+- Diagnostic scripts remain in their original location for backward compatibility
 
-**Features:**
-- Check for orphaned nodes
-- Verify relationship integrity
-- Validate required properties
-- Generate integrity report
-
-**Usage:**
-```bash
-# Run full validation
-python3 utilities/validate_data.py
-
-# Check specific validations
-python3 utilities/validate_data.py --check orphans relationships
-
-# Generate detailed report
-python3 utilities/validate_data.py --report
-```
-
-### 4. migrate_schema.py
-**Purpose:** Apply schema migrations to Neo4j database
-
-**Features:**
-- Apply schema updates from .cypher files
-- Track migration history
-- Rollback support
-- Dry-run mode
-
-**Usage:**
-```bash
-# Apply pending migrations
-python3 utilities/migrate_schema.py
-
-# Check migration status
-python3 utilities/migrate_schema.py --status
-
-# Rollback last migration
-python3 utilities/migrate_schema.py --rollback
-```
-
-## Configuration
-
-All utilities read configuration from (in order of priority):
-1. Command-line arguments (highest priority)
-2. `.env` file in project root
-3. Environment variables (NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD)
-4. `~/.avatar-engine/avatar_config.json` (if exists)
-5. Default values
-
-### Setting Up Authentication
-
-**Method 1: Use the setup script (recommended)**
-```bash
-python3 utilities/setup_neo4j.py
-```
-
-**Method 2: Create .env file manually**
-```bash
-cp .env.example .env
-# Edit .env and add your Neo4j password
-```
-
-**Method 3: Export environment variables**
-```bash
-export NEO4J_PASSWORD='your_password'
-export NEO4J_URI='bolt://localhost:7687'
-export NEO4J_USERNAME='neo4j'
-```
-
-**Method 4: Pass as command-line arguments**
-```bash
-python3 utilities/reset_neo4j.py --password 'your_password' --uri 'bolt://localhost:7687'
-```
-
-## Backup Directory
-
-Backups are stored in `utilities/backups/` with timestamp-based naming:
-- `neo4j_backup_YYYYMMDD_HHMMSS.json`
-- `neo4j_export_YYYYMMDD_HHMMSS.cypher`
-
-## Safety Features
-
-All destructive operations include:
-- Confirmation prompts
-- Dry-run mode
-- Automatic backups (unless explicitly disabled)
-- Transaction rollback on errors
-- Detailed logging
-
-## Requirements
-
-- Python 3.8+
-- neo4j driver (`pip install neo4j`)
-- Access to Neo4j database (default: bolt://localhost:7687)
-
-## Development
-
-To add new utilities:
-1. Create a new Python script in this directory
-2. Follow the existing pattern for configuration and logging
-3. Update this README with documentation
-4. Add tests in the `tests/utilities/` directory
-
-## Troubleshooting
-
-**Connection Issues:**
-```bash
-# Test Neo4j connection
-python3 -c "from neo4j import GraphDatabase; GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j', 'password')).verify_connectivity()"
-```
-
-**Permission Issues:**
-- Ensure Neo4j user has appropriate permissions
-- Check file permissions for backup directory
-
-**Memory Issues:**
-- Use batch processing for large datasets
-- Adjust batch_size parameter in scripts
+*Last Updated: 2025-09-14*

@@ -77,6 +77,10 @@ venv.bak/
 git-hub-script/
 git-hub-scripts/
 
+# Debug and temporary fix scripts
+utilities/debug/
+utilities/archived_fixes/
+
 # Database backups and reports
 utilities/backups/
 utilities/reports/
@@ -94,6 +98,14 @@ avatar_config.json
 .env
 .env.local
 .env.*.local
+
+# Data directories
+data/extracted/
+data/temp/
+data/checkpoints/
+data/profiles/
+data/summaries/
+logs/*.log
 
 # macOS
 .DS_Store
