@@ -9,12 +9,32 @@
 
 ## 🚀 Overview
 
-Avatar-Engine is a sophisticated conversation analysis system that:
-- **Loads message data** from various sources (SQLite, JSON) into Neo4j
-- **Analyzes communication patterns** using advanced NLP techniques
-- **Generates personality profiles** with optional LLM enhancement
-- **Creates AI avatars** that can respond in the authentic voice of analyzed individuals
-- **Protects privacy** with comprehensive security features (NEW in v2.0)
+Avatar-Engine is a sophisticated conversation analysis system that transforms your iMessage conversations into personalized AI avatars through a five-stage pipeline:
+
+1. **📱 Extract** - Pulls messages from iMessage database with contact enrichment
+2. **💾 Load** - Imports conversations into Neo4j graph database
+3. **🔍 Analyze** - Detects communication patterns, nicknames, and relationships
+4. **🧠 Enhance** - (Optional) Adds deep personality insights via LLM
+5. **🤖 Generate** - Creates contextual responses in authentic voice
+
+### End-to-End Process Flow
+
+```
+iMessage Database → JSON Export → Neo4j Graph → Avatar Profiles → AI Responses
+     (Extract)        (Load)       (Analyze)      (Enhance)       (Generate)
+```
+
+### 📝 How It Works
+
+1. **Extraction**: The system reads your iMessage database (`~/Library/Messages/chat.db`), enriches messages with contact names, anonymizes phone numbers for privacy, and exports to JSON.
+
+2. **Loading**: The JSON data is imported into Neo4j, creating a graph of People, Messages, and their relationships (who sent what to whom).
+
+3. **Analysis**: The avatar intelligence pipeline analyzes the graph to detect communication patterns, nicknames, signature phrases, and relationship types.
+
+4. **Enhancement** (Optional): With an Anthropic API key, Claude AI performs deep personality analysis, adding psychological insights and communication style profiling.
+
+5. **Generation**: The system can generate contextual responses that match each person's authentic communication style, or train local SLM models for offline use.
 
 ### 🔒 Security Features (v2.1 - Enhanced)
 - **Encrypted sensitive data** - PII protection with AES-256 encryption
@@ -27,6 +47,15 @@ Avatar-Engine is a sophisticated conversation analysis system that:
 - **Rate limiting** - Configurable abuse prevention for APIs and database
 - **Secure audit logging** - Automatic PII/secret redaction in all logs
 - **Enhanced pattern detection** - AWS keys, JWT tokens, and configurable patterns
+
+### 🌐 Network Volume Support (v2.2 - NEW)
+- **Automatic NAS/Network Detection** - Transparently handles SQLite on network volumes
+- **Local Storage Manager** - Automatic local caching for network-mounted databases
+- **Platform Support** - Works on macOS and Linux network mounts (SMB, AFP, NFS)
+- **Zero Configuration** - No code changes needed, works automatically
+- **Smart Sync** - Results automatically synced back to network storage
+- **Error Recovery** - Graceful handling of network failures
+- See [LocalStorageManager Documentation](docs/LOCAL_STORAGE_MANAGER.md) for details
 
 ## 📋 Table of Contents
 
@@ -42,14 +71,39 @@ Avatar-Engine is a sophisticated conversation analysis system that:
 
 ## ✨ Features
 
-### Core Capabilities
-- **Message Data Loading**: Import conversations from SQLite databases or JSON files
-- **Intelligent Text Cleaning**: Remove binary artifacts and system metadata
-- **Graph-Based Storage**: Leverage Neo4j for relationship-aware data storage
-- **Pattern Detection**: Identify nicknames, signature phrases, and communication styles
-- **Relationship Analysis**: Infer relationship types (family, friend, romantic, professional)
-- **Personality Profiling**: Generate comprehensive communication profiles
-- **LLM Integration**: Optional Claude AI enhancement for deeper insights
+### Pipeline Stages
+
+#### Stage 1: Message Extraction
+- **iMessage Integration**: Direct extraction from macOS chat.db
+- **Contact Enrichment**: Automatic name resolution from AddressBook
+- **Privacy Protection**: Phone number anonymization via SHA-256
+- **Batch Processing**: Handle millions of messages efficiently
+- **Checkpoint Recovery**: Resume interrupted extractions
+
+#### Stage 2: Data Loading
+- **Graph Import**: Load conversations into Neo4j
+- **Relationship Mapping**: Create SENT/RECEIVED connections
+- **Group Detection**: Identify and model group conversations
+- **Text Cleaning**: Remove binary artifacts and metadata
+- **Secure Queries**: Parameterized Cypher to prevent injection
+
+#### Stage 3: Avatar Generation
+- **Pattern Detection**: Identify communication signatures
+- **Nickname Discovery**: Find how people address each other
+- **Relationship Inference**: Determine connection types
+- **Topic Analysis**: Discover conversation preferences
+- **Temporal Patterns**: Analyze time-based behaviors
+
+#### Stage 4: LLM Enhancement (Optional)
+- **Deep Analysis**: Psychological profiling via Claude AI
+- **Personality Insights**: MBTI-style assessments
+- **Communication Style**: Formal/informal analysis
+- **Emotional Patterns**: Sentiment and expression mapping
+
+#### Stage 5: Response Generation
+- **Contextual Responses**: Topic and partner-aware generation
+- **Voice Authenticity**: Maintain individual communication style
+- **SLM Training**: Create local models for offline use
 
 ### Analysis Engines
 - **Nickname Detector**: Identifies how people address each other
@@ -110,36 +164,63 @@ python3 src/avatar_system_deployment.py deploy
 
 ## 🚀 Quick Start
 
-### 1. Load Your Message Data (Securely)
+### Option A: Full Pipeline (Recommended)
+
+Run the complete extraction → loading → profiling pipeline:
 
 ```bash
-# From SQLite database with anonymization
-python3 src/message_data_loader.py /path/to/messages.db --password neo4j_password --anonymize
+# Extract, load, and generate profiles automatically
+python3 src/pipelines/extraction_pipeline.py --limit 5000
 
-# From JSON file
-python3 src/message_data_loader.py /path/to/messages.json --password neo4j_password
+# With LLM enhancement (requires Anthropic API key)
+python3 src/pipelines/extraction_pipeline.py --limit 5000 --enable-llm
 ```
 
-### 2. Generate Avatar Profiles
+### Option B: Step-by-Step Process
+
+#### Step 1: Extract Messages from iMessage
 
 ```bash
-# Initialize profiles for all people with 50+ messages
+# Extract recent messages (recommended for testing)
+python3 src/imessage_extractor.py --limit 5000
+
+# Extract all messages
+python3 src/imessage_extractor.py
+```
+
+This creates: `data/extracted/imessage_export_YYYYMMDD_HHMMSS.json`
+
+#### Step 2: Load into Neo4j
+
+```bash
+# Load the extracted JSON
+python3 src/message_data_loader.py data/extracted/imessage_export_*.json \
+  --password your_neo4j_password
+```
+
+#### Step 3: Generate Avatar Profiles
+
+```bash
+# Create profiles for all participants with 50+ messages
 python3 src/avatar_intelligence_pipeline.py \
   --command init-all \
   --min-messages 50 \
   --password neo4j_password
+```
 
-# Or initialize a specific person
-python3 src/avatar_intelligence_pipeline.py \
-  --command init-person \
+#### Step 4: (Optional) Enhance with LLM
+
+```bash
+# Add deep personality analysis via Claude
+python3 src/enhanced_avatar_pipeline.py \
   --person "John Doe" \
   --password neo4j_password
 ```
 
-### 3. Generate Avatar Responses
+#### Step 5: Generate Avatar Responses
 
 ```bash
-# Generate an avatar prompt for a person
+# Generate contextual response
 python3 src/avatar_intelligence_pipeline.py \
   --command generate \
   --person "John Doe" \
@@ -148,7 +229,7 @@ python3 src/avatar_intelligence_pipeline.py \
   --password neo4j_password
 ```
 
-### 4. Train Small Language Models (Mac Only)
+### Option C: Train Small Language Models (Mac Only)
 
 ```bash
 # Full pipeline: Extract, Train, and Chat
@@ -175,12 +256,17 @@ For detailed SLM documentation, see [docs/slm/slm_documentation.md](docs/slm/slm
 Avatar-Engine/
 │
 ├── src/                              # Core source code
-│   ├── avatar_intelligence_pipeline.py   # Main analysis system
-│   ├── avatar_system_deployment.py       # Schema deployment
-│   ├── config_manager.py                 # Configuration management
+│   ├── imessage_extractor.py            # iMessage database extraction
+│   ├── message_data_loader.py           # JSON to Neo4j import
+│   ├── avatar_intelligence_pipeline.py   # Avatar profile generation
 │   ├── enhanced_avatar_pipeline.py       # LLM-enhanced analysis
 │   ├── llm_integrator.py                 # Claude AI integration
-│   └── message_data_loader.py            # Data import pipeline
+│   ├── avatar_system_deployment.py       # Schema deployment
+│   ├── config_manager.py                 # Configuration management
+│   ├── security_utils.py                 # Security utilities
+│   ├── secure_database.py                # Secure Neo4j wrapper
+│   └── pipelines/
+│       └── extraction_pipeline.py        # Orchestrates full pipeline
 │
 ├── utilities/                        # Database utilities
 │   ├── setup_neo4j.py               # Neo4j configuration
@@ -239,23 +325,28 @@ See [docs/neo4j_data_model.md](docs/neo4j_data_model.md) for complete details.
 ### Python API
 
 ```python
-from src.avatar_intelligence_pipeline import AvatarSystemManager
+from src.imessage_extractor import IMessageExtractor
 from src.message_data_loader import MessageDataLoader
+from src.avatar_intelligence_pipeline import AvatarSystemManager
 from neo4j import GraphDatabase
 
-# Connect to Neo4j
+# Step 1: Extract from iMessage
+extractor = IMessageExtractor()
+json_file = extractor.run_extraction_pipeline(limit=5000)
+
+# Step 2: Connect to Neo4j
 driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
 
-# Load message data
+# Step 3: Load extracted messages
 loader = MessageDataLoader(neo4j_driver=driver)
-stats = loader.load_from_sqlite("/path/to/messages.db")
+stats = loader.load_from_json(json_file)
 print(f"Loaded {stats['messages_created']} messages")
 
-# Create avatar profiles
+# Step 4: Create avatar profiles
 avatar_system = AvatarSystemManager(driver)
 avatar_system.initialize_all_people(min_messages=50)
 
-# Generate avatar response
+# Step 5: Generate avatar response
 prompt = avatar_system.generate_response(
     person_identifier="John Doe",
     conversation_type="1:1",
@@ -270,17 +361,24 @@ print(prompt)
 All major components provide CLI interfaces:
 
 ```bash
-# System deployment and management
-python3 src/avatar_system_deployment.py --help
+# Full extraction pipeline (recommended)
+python3 src/pipelines/extraction_pipeline.py --help
 
-# Message data loading
+# Individual components:
+# Extract from iMessage
+python3 src/imessage_extractor.py --help
+
+# Load into Neo4j
 python3 src/message_data_loader.py --help
 
-# Avatar intelligence pipeline
+# Generate avatar profiles
 python3 src/avatar_intelligence_pipeline.py --help
 
-# Enhanced LLM analysis (requires Anthropic API key)
+# LLM enhancement (requires Anthropic API key)
 python3 src/enhanced_avatar_pipeline.py --help
+
+# System deployment and management
+python3 src/avatar_system_deployment.py --help
 ```
 
 ### Neo4j Queries
@@ -329,9 +427,12 @@ python3 utilities/debug_neo4j.py
 
 ## 📚 Documentation
 
+- **[iMessage Extraction Guide](docs/IMESSAGE_EXTRACTION_GUIDE.md)** - Step-by-step extraction instructions
 - **[Message Data Loading Guide](docs/message_data_loading.md)** - How to import your data
 - **[Neo4j Data Model](docs/neo4j_data_model.md)** - Complete schema documentation
+- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 - **[Quick Start Guide](QUICKSTART.md)** - Get running quickly
+- **[Security Enhancements](SECURITY_ENHANCEMENTS.md)** - Security features documentation
 - **[Change Log](CHANGELOG.md)** - Version history and updates
 
 ## 🧪 Testing
@@ -360,6 +461,23 @@ Contributions are welcome! Please:
 5. Open a Pull Request
 
 ## 🖄 Version History
+
+### v2.2.0 (2025-09-14) - Network Volume Support
+- 🌐 **Network Storage Compatibility**
+  - Automatic detection of NAS/network volumes
+  - Transparent local storage for SQLite operations
+  - Fixes "unable to open database file" on network mounts
+  - Platform-specific detection (macOS, Linux)
+  - Smart sync back to network storage
+- 🔧 **LocalStorageManager Implementation**
+  - Zero-configuration operation
+  - Robust error handling and recovery
+  - Storage size limit enforcement
+  - Automatic cleanup mechanisms
+- 📝 **Documentation**
+  - Comprehensive LocalStorageManager guide
+  - Troubleshooting documentation
+  - Integration examples
 
 ### v2.0.0 (2025-01-30) - Security Enhancement Release
 - 🔒 **Major Security Overhaul**

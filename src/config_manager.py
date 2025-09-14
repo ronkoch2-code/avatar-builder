@@ -49,9 +49,14 @@ class Neo4jConfig:
     connection_timeout: float = 30.0
     encrypted: bool = True  # Use TLS by default
     trust: str = "TRUST_SYSTEM_CA_SIGNED_CERTIFICATES"
+    _skip_validation: bool = field(default=False, repr=False)  # Internal flag
     
     def __post_init__(self):
         """Validate configuration after initialization"""
+        # Skip validation during initial creation in ConfigManager
+        if self._skip_validation:
+            return
+            
         if not self.password:
             raise ValueError("Neo4j password cannot be empty")
         if not self.uri.startswith(('bolt://', 'neo4j://', 'neo4j+s://')):
@@ -136,13 +141,13 @@ class ConfigManager:
         # Create config directory if it doesn't exist
         self.config_dir.mkdir(exist_ok=True)
         
-        # Initialize configurations
-        self.neo4j = Neo4jConfig()
+        # Initialize configurations with validation skipped
+        self.neo4j = Neo4jConfig(_skip_validation=True)
         self.anthropic = AnthropicConfig()
         self.analysis = AnalysisConfig()
         self.system = SystemConfig()
         
-        # Load configuration
+        # Load configuration from file and environment
         self.load_config()
         
         # Setup logging
@@ -198,6 +203,7 @@ class ConfigManager:
         password = os.getenv("NEO4J_PASSWORD", "")
         if password:
             self.neo4j.password = password
+            logger.info("Loaded Neo4j password from environment")
         else:
             logger.warning("Neo4j password not found in environment variables")
         
@@ -210,28 +216,93 @@ class ConfigManager:
         else:
             logger.warning("Anthropic API key not found in environment variables")
         
-        # Security validation
-        self._validate_sensitive_config()
         self.anthropic.model = os.getenv("CLAUDE_MODEL", self.anthropic.model)
         
         # System
         self.system.log_level = os.getenv("LOG_LEVEL", self.system.log_level)
+        
+        # Parse numeric environment variables
+        try:
+            if os.getenv("DAILY_COST_LIMIT"):
+                self.anthropic.daily_cost_limit = float(os.getenv("DAILY_COST_LIMIT"))
+            if os.getenv("MAX_CONCURRENT_REQUESTS"):
+                self.anthropic.max_concurrent_requests = int(os.getenv("MAX_CONCURRENT_REQUESTS"))
+            if os.getenv("MIN_MESSAGES_FOR_ANALYSIS"):
+                self.analysis.min_messages_for_analysis = int(os.getenv("MIN_MESSAGES_FOR_ANALYSIS"))
+        except ValueError as e:
+            logger.warning(f"Failed to parse numeric environment variable: {e}")
     
     def _validate_sensitive_config(self):
-        """Validate sensitive configuration with security checks"""
-        # Check for hardcoded credentials (development warning)
-        if self.neo4j.password and self.neo4j.password in ['password', 'neo4j', 'admin', '123456']:
-            warnings.warn("Weak Neo4j password detected! Use a strong password in production.", SecurityWarning)
+        """Validate sensitive configuration with security checks - ENFORCED SECURITY POLICY"""
+        # SECURITY ENFORCEMENT: Reject weak passwords immediately
+        weak_passwords = ['password', 'neo4j', 'admin', '123456', 'changeme', 'default', 'root', 'test', 'demo']
+        if self.neo4j.password and self.neo4j.password.lower() in weak_passwords:
+            raise ValueError(
+                f"SECURITY ERROR: Weak password '{self.neo4j.password}' is not allowed! "
+                "Use a strong password with at least 12 characters, including uppercase, "
+                "lowercase, numbers, and special characters."
+            )
         
+        # Check if we should enforce strict password validation
+        # Allow existing passwords if ALLOW_EXISTING_PASSWORD env var is set
+        allow_existing = os.getenv("ALLOW_EXISTING_PASSWORD", "false").lower() == "true"
+        
+        # Enforce minimum password length and complexity (unless allowing existing)
+        if not allow_existing and self.neo4j.password and len(self.neo4j.password) < 12:
+            logger.warning(f"Password is only {len(self.neo4j.password)} characters. "
+                         "For production use, passwords should be at least 12 characters. "
+                         "Set ALLOW_EXISTING_PASSWORD=true to bypass this check.")
+            raise ValueError("SECURITY ERROR: Password must be at least 12 characters long. "
+                           "Set ALLOW_EXISTING_PASSWORD=true to use existing shorter password.")
+        
+        # Check for test API keys - FAIL instead of warn
         if self.anthropic.api_key and 'test' in self.anthropic.api_key.lower():
-            warnings.warn("Test API key detected! Use production key for real usage.", SecurityWarning)
+            raise ValueError("SECURITY ERROR: Test API key detected! Use a production API key for real usage.")
+        
+        # Additional password strength validation (unless allowing existing)
+        if not allow_existing and self.neo4j.password:
+            self._enforce_password_complexity(self.neo4j.password)
+    
+    def _enforce_password_complexity(self, password: str):
+        """Enforce password complexity requirements"""
+        import re
+        
+        # Check for uppercase, lowercase, numbers, and special characters
+        if not re.search(r'[A-Z]', password):
+            raise ValueError("SECURITY ERROR: Password must contain at least one uppercase letter.")
+        
+        if not re.search(r'[a-z]', password):
+            raise ValueError("SECURITY ERROR: Password must contain at least one lowercase letter.")
+        
+        if not re.search(r'\d', password):
+            raise ValueError("SECURITY ERROR: Password must contain at least one number.")
+        
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+            raise ValueError("SECURITY ERROR: Password must contain at least one special character (!@#$%^&*(),.?\":{}|<>).")
+        
+        # Check for common patterns that make passwords weak
+        common_patterns = ['1234', 'abcd', 'qwerty']
+        password_lower = password.lower()
+        for pattern in common_patterns:
+            if pattern in password_lower:
+                raise ValueError(f"SECURITY ERROR: Password contains common pattern '{pattern}'. Use a more complex password.")
+        
+        # Check for repeated characters (like 'aaaa' or '1111')
+        if re.search(r'(.)\1{3,}', password):
+            raise ValueError("SECURITY ERROR: Password contains too many repeated characters. Use more variety.")
     
     def validate_config(self):
         """Validate configuration settings with security checks"""
         # Check for required settings
         if not self.neo4j.password:
-            logger.error("No Neo4j password configured - database connection will fail")
-            raise ValueError("Neo4j password is required")
+            logger.error("No Neo4j password configured")
+            # Try one more time to load from environment
+            env_password = os.getenv("NEO4J_PASSWORD")
+            if env_password:
+                logger.info("Found password in environment during validation, applying it now")
+                self.neo4j.password = env_password
+            else:
+                raise ValueError("Neo4j password is required")
         
         if not self.anthropic.api_key:
             logger.warning("No Anthropic API key configured - LLM features disabled")
@@ -270,41 +341,8 @@ class ConfigManager:
             })
         
         return self.anthropic.api_key
-        
-        # Parse numeric environment variables
-        try:
-            if os.getenv("DAILY_COST_LIMIT"):
-                self.anthropic.daily_cost_limit = float(os.getenv("DAILY_COST_LIMIT"))
-            if os.getenv("MAX_CONCURRENT_REQUESTS"):
-                self.anthropic.max_concurrent_requests = int(os.getenv("MAX_CONCURRENT_REQUESTS"))
-            if os.getenv("MIN_MESSAGES_FOR_ANALYSIS"):
-                self.analysis.min_messages_for_analysis = int(os.getenv("MIN_MESSAGES_FOR_ANALYSIS"))
-        except ValueError as e:
-            logger.warning(f"Failed to parse numeric environment variable: {e}")
     
-    def validate_config(self):
-        """Validate configuration settings"""
-        errors = []
-        
-        # Validate Neo4j
-        if not self.neo4j.password:
-            errors.append("Neo4j password is required")
-        
-        # Validate Anthropic
-        if self.system.enable_llm_analysis and not self.anthropic.api_key:
-            errors.append("Anthropic API key is required when LLM analysis is enabled")
-        
-        # Validate analysis settings
-        if self.analysis.min_messages_for_analysis < 10:
-            errors.append("Minimum messages for analysis should be at least 10")
-        
-        if self.analysis.max_messages_per_analysis < self.analysis.min_messages_for_analysis:
-            errors.append("Maximum messages per analysis cannot be less than minimum")
-        
-        if errors:
-            raise ValueError(f"Configuration validation failed: {', '.join(errors)}")
-        
-        logger.info("Configuration validation passed")
+
     
     def save_config(self):
         """Save current configuration to file"""
