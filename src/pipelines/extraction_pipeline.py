@@ -28,7 +28,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 # Import extraction and processing modules
 from imessage_extractor import IMessageExtractor
 from message_data_loader import MessageDataLoader
-from avatar_intelligence_pipeline import AvatarIntelligencePipeline
+from avatar_intelligence_pipeline import AvatarSystemManager
 from config_manager import ConfigManager
 from security_utils import SecureLogger
 
@@ -126,7 +126,7 @@ class ExtractionPipeline:
             })
             
             # Save checkpoint if configured
-            if self.config['pipeline_config']['save_checkpoints']:
+            if self.config.get('pipeline_config', {}).get('save_checkpoints', True):
                 self._save_checkpoint('stage_1_complete')
             
             return output_file
@@ -145,7 +145,7 @@ class ExtractionPipeline:
                 'timestamp': datetime.now().isoformat()
             })
             
-            if not self.config['pipeline_config']['continue_on_error']:
+            if not self.config.get('pipeline_config', {}).get('continue_on_error', False):
                 raise
             
             return None
@@ -168,31 +168,19 @@ class ExtractionPipeline:
         })
         
         try:
-            # Initialize data loader
-            loader = MessageDataLoader(
-                neo4j_uri=self.config_manager.neo4j_uri,
-                neo4j_user=self.config_manager.neo4j_user,
-                neo4j_password=self.config_manager.neo4j_password
+            # Initialize data loader with Neo4j driver
+            from neo4j import GraphDatabase
+            
+            driver = GraphDatabase.driver(
+                self.config_manager.neo4j.uri,
+                auth=(self.config_manager.neo4j.username, self.config_manager.neo4j.password)
             )
             
-            # Load messages into Neo4j
-            with open(json_file, 'r') as f:
-                messages = json.load(f)
+            loader = MessageDataLoader(driver)
             
-            # Process in batches
-            batch_size = self.config['processor_config']['batch_size']
-            total_processed = 0
-            
-            for i in range(0, len(messages), batch_size):
-                batch = messages[i:i + batch_size]
-                loader.load_json_messages(batch)
-                total_processed += len(batch)
-                
-                self.logger.log_event("processing_progress", {
-                    "processed": total_processed,
-                    "total": len(messages),
-                    "percentage": (total_processed / len(messages)) * 100
-                })
+            # Load messages from JSON file into Neo4j
+            stats = loader.load_from_json(json_file, limit=None)
+            total_processed = stats.get('messages_created', 0)
             
             # Update state
             self.state['stages_completed'].append('processing')
@@ -200,8 +188,12 @@ class ExtractionPipeline:
             results = {
                 'messages_loaded': total_processed,
                 'neo4j_status': 'connected',
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'loader_stats': stats
             }
+            
+            # Clean up driver
+            driver.close()
             
             self.logger.log_event("pipeline_stage", {
                 "stage": 2,
@@ -211,7 +203,7 @@ class ExtractionPipeline:
             })
             
             # Save checkpoint
-            if self.config['pipeline_config']['save_checkpoints']:
+            if self.config.get('pipeline_config', {}).get('save_checkpoints', True):
                 self._save_checkpoint('stage_2_complete')
             
             return results
@@ -230,7 +222,7 @@ class ExtractionPipeline:
                 'timestamp': datetime.now().isoformat()
             })
             
-            if not self.config['pipeline_config']['continue_on_error']:
+            if not self.config.get('pipeline_config', {}).get('continue_on_error', False):
                 raise
             
             return {'status': 'failed', 'error': str(e)}
@@ -249,36 +241,47 @@ class ExtractionPipeline:
         })
         
         try:
-            # Initialize Avatar Intelligence Pipeline
-            avatar_pipeline = AvatarIntelligencePipeline(
-                neo4j_uri=self.config_manager.neo4j_uri,
-                neo4j_user=self.config_manager.neo4j_user,
-                neo4j_password=self.config_manager.neo4j_password,
-                claude_api_key=self.config_manager.claude_api_key if self.config['processor_config']['enable_llm'] else None
+            # Initialize Avatar System Manager
+            from neo4j import GraphDatabase
+            
+            # Create Neo4j driver
+            driver = GraphDatabase.driver(
+                self.config_manager.neo4j.uri,
+                auth=(self.config_manager.neo4j.username, self.config_manager.neo4j.password)
             )
             
-            # Generate profiles
-            profiles = avatar_pipeline.generate_all_profiles()
+            # Initialize the avatar system manager
+            avatar_manager = AvatarSystemManager(driver)
             
-            # Save profiles
-            output_dir = Path(self.config['extractor_config']['output_dir']) / 'profiles'
+            # Generate profiles for all people with sufficient data
+            stats = avatar_manager.initialize_all_people(min_messages=50)
+            
+            # Get the actual profile count from stats
+            profiles_count = stats.get('created', 0)
+            
+            # Save profile statistics
+            output_dir = Path(self.config.get('extractor_config', {}).get('output_dir', 'data/extracted')) / 'profiles'
             output_dir.mkdir(parents=True, exist_ok=True, mode=0o750)
             
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            profiles_file = output_dir / f"personality_profiles_{timestamp}.json"
+            stats_file = output_dir / f"profile_generation_stats_{timestamp}.json"
             
-            with open(profiles_file, 'w') as f:
-                json.dump(profiles, f, indent=2)
+            with open(stats_file, 'w') as f:
+                json.dump(stats, f, indent=2)
             
             # Update state
-            self.state['profiles_generated'] = len(profiles)
+            self.state['profiles_generated'] = profiles_count
             self.state['stages_completed'].append('profiling')
             
             results = {
-                'profiles_generated': len(profiles),
-                'output_file': str(profiles_file),
+                'profiles_generated': profiles_count,
+                'output_file': str(stats_file),
+                'stats': stats,
                 'timestamp': datetime.now().isoformat()
             }
+            
+            # Clean up driver
+            driver.close()
             
             self.logger.log_event("pipeline_stage", {
                 "stage": 3,
@@ -288,7 +291,7 @@ class ExtractionPipeline:
             })
             
             # Save checkpoint
-            if self.config['pipeline_config']['save_checkpoints']:
+            if self.config.get('pipeline_config', {}).get('save_checkpoints', True):
                 self._save_checkpoint('stage_3_complete')
             
             return results
@@ -307,7 +310,7 @@ class ExtractionPipeline:
                 'timestamp': datetime.now().isoformat()
             })
             
-            if not self.config['pipeline_config']['continue_on_error']:
+            if not self.config.get('pipeline_config', {}).get('continue_on_error', False):
                 raise
             
             return {'status': 'failed', 'error': str(e)}
@@ -421,7 +424,7 @@ class ExtractionPipeline:
     
     def _save_checkpoint(self, checkpoint_name: str):
         """Save pipeline checkpoint for recovery"""
-        checkpoint_dir = Path(self.config['pipeline_config']['checkpoint_dir'])
+        checkpoint_dir = Path(self.config.get('pipeline_config', {}).get('checkpoint_dir', 'data/checkpoints'))
         checkpoint_dir.mkdir(parents=True, exist_ok=True, mode=0o750)
         
         checkpoint_file = checkpoint_dir / f"{checkpoint_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -436,7 +439,7 @@ class ExtractionPipeline:
     
     def _save_pipeline_summary(self, summary: Dict[str, Any]):
         """Save pipeline execution summary"""
-        output_dir = Path(self.config['extractor_config']['output_dir']) / 'summaries'
+        output_dir = Path(self.config.get('extractor_config', {}).get('output_dir', 'data/extracted')) / 'summaries'
         output_dir.mkdir(parents=True, exist_ok=True, mode=0o750)
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
