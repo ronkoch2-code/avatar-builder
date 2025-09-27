@@ -36,10 +36,24 @@ iMessage Database → JSON Export → Neo4j Graph → Avatar Profiles → AI Res
 
 5. **Generation**: The system can generate contextual responses that match each person's authentic communication style, or train local SLM models for offline use.
 
+## 📢 Latest Updates (2025-09-14)
+
+- ✅ **Fixed**: ImportError in extraction pipeline (`AvatarIntelligencePipeline` → `AvatarSystemManager`)
+- ✅ **Fixed**: NAS/network volume SQLite access issues with automatic local storage fallback
+- ✅ **Added**: Comprehensive reliability module with error handling, retry logic, and circuit breakers
+- ✅ **Enhanced**: Security features including removed default credentials and strong input validation
+- ✅ **Consolidated**: Backlog management with prioritized feature tracking
+
 ### 🔒 Security Features (v2.1 - Enhanced)
 - **Encrypted sensitive data** - PII protection with AES-256 encryption
 - **PBKDF2 key derivation** - Enhanced key security with 100,000 iterations
 - **No default credentials** - Mandatory explicit configuration for all secrets
+
+### 🚀 MLX Framework Support (v2.3 - Resolved)
+- **MLX Issue Fixed** - Resolved conflicts with instructlab package
+- **Apple Silicon Optimization** - Full Metal acceleration support for SLM training
+- **Fallback Options** - CPU-based training available when MLX unavailable
+- **Platform Detection** - Robust handling of Rosetta 2 emulation scenarios
 - **Anonymized phone numbers** - Privacy-preserving data storage
 - **Parameterized queries** - SQL/Cypher injection prevention
 - **Secure API key management** - Environment-based configuration with validation
@@ -117,7 +131,11 @@ iMessage Database → JSON Export → Neo4j Graph → Avatar Profiles → AI Res
 - **Metal Acceleration**: Leverages Apple Silicon for efficient training and inference
 - **MLX Framework**: Optimized for M1/M2/M3 processors
 - **Local Inference**: Run avatar models locally without cloud dependencies
-- **Interactive Chat**: Real-time conversation with trained avatars
+- **Interactive Chat Interface**: NEW! Command-line interface for chatting with trained models
+  - `python3 src/slm/inference/chat.py` - Start interactive chat
+  - Model selection menu with auto-detection
+  - Conversation history and save/load support
+  - Works with both MLX and fallback models
 - **Streaming Generation**: Low-latency response streaming
 - **Batch Processing**: Efficient multi-prompt processing
 
@@ -461,6 +479,22 @@ Contributions are welcome! Please:
 5. Open a Pull Request
 
 ## 🖄 Version History
+
+### v2.3.0 (2025-09-27) - MLX Framework Resolution
+- 🍏 **MLX Training Support**
+  - Resolved instructlab package conflicts
+  - Full Apple Silicon Metal acceleration
+  - Robust platform detection for Rosetta 2
+  - Dynamic library path configuration
+  - CPU fallback options available
+- 🔧 **Developer Experience**
+  - Comprehensive diagnostic tools
+  - Multiple fix strategies documented
+  - Wrapper scripts for environment setup
+- 📚 **Documentation**
+  - MLX troubleshooting guide
+  - Platform-specific setup instructions
+  - Optional dependency management standards
 
 ### v2.2.0 (2025-09-14) - Network Volume Support
 - 🌐 **Network Storage Compatibility**
