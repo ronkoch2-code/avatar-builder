@@ -26,8 +26,8 @@ from .slm_trainer import (
 
 from .slm_inference_engine import (
     SLMInferenceEngine,
-    ConversationContext,
-    GenerationConfig
+    InferenceConfig,
+    ConversationManager
 )
 
 __all__ = [
@@ -42,6 +42,6 @@ __all__ = [
     "ConversationTokenizer",
     "AnthropicEnhancer",
     "SLMInferenceEngine",
-    "ConversationContext",
-    "GenerationConfig"
+    "InferenceConfig",
+    "ConversationManager"
 ]
