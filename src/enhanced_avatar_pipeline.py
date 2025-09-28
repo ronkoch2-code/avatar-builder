@@ -64,8 +64,8 @@ class EnhancedAvatarSystemManager:
             self.llm_integrator = LLMIntegrator(
                 api_key=anthropic_api_key,
                 model=claude_model,
-                max_concurrent=3,  # Conservative to manage costs
-                rate_limit_per_minute=50
+                max_concurrent=1,  # Reduced to avoid 429 errors
+                rate_limit_per_minute=10  # Conservative rate limit
             )
             logger.info(f"LLM integration enabled with model: {claude_model}")
         else:
@@ -648,7 +648,7 @@ class EnhancedAvatarSystemManager:
     
     async def batch_create_profiles(self, person_identifiers: List[str],
                                   min_messages: int = 50,
-                                  max_concurrent: int = 2) -> List[Dict[str, Any]]:
+                                  max_concurrent: int = 1) -> List[Dict[str, Any]]:
         """
         Create enhanced profiles for multiple people concurrently
         

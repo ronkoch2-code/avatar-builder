@@ -36,8 +36,15 @@ iMessage Database → JSON Export → Neo4j Graph → Avatar Profiles → AI Res
 
 5. **Generation**: The system can generate contextual responses that match each person's authentic communication style, or train local SLM models for offline use.
 
-## 📢 Latest Updates (2025-09-14)
+## 📢 Latest Updates (2025-09-28)
 
+- ✅ **NEW**: Comprehensive Anthropic Token Balance Monitoring system
+  - Real-time token usage tracking with SQLite storage
+  - Before/after balance capture for pipeline operations
+  - Session aggregation and daily summaries
+  - Cost calculation with cache savings tracking
+  - Threshold alerts (warning at 80%, critical at 95%)
+  - CLI reporting tools (balance, reports, summaries)
 - ✅ **Fixed**: ImportError in extraction pipeline (`AvatarIntelligencePipeline` → `AvatarSystemManager`)
 - ✅ **Fixed**: NAS/network volume SQLite access issues with automatic local storage fallback
 - ✅ **Added**: Comprehensive reliability module with error handling, retry logic, and circuit breakers
@@ -48,6 +55,20 @@ iMessage Database → JSON Export → Neo4j Graph → Avatar Profiles → AI Res
 - **Encrypted sensitive data** - PII protection with AES-256 encryption
 - **PBKDF2 key derivation** - Enhanced key security with 100,000 iterations
 - **No default credentials** - Mandatory explicit configuration for all secrets
+
+### 📊 Token Balance Monitoring (v2.4 - NEW)
+- **Real-time Usage Tracking** - Monitor tokens per API call with operation labels
+- **SQLite Storage** - Persistent history with 30-day retention
+- **Session Management** - Automatic session tracking with aggregated summaries
+- **Cost Analysis** - Accurate pricing calculations with cache savings
+- **Threshold Alerts** - Configurable warnings (80%) and critical alerts (95%)
+- **CLI Reporting Tools**:
+  - `python3 src/token_monitor.py balance` - Check current balance
+  - `python3 src/token_monitor.py report --days 7` - Generate usage reports
+  - `python3 src/token_monitor.py summary` - View session summary
+- **Pipeline Integration** - Automatic before/after balance capture
+- **Multiple Output Formats** - Text, JSON, and CSV reports
+- See [Token Monitoring Guide](docs/TOKEN_MONITORING_GUIDE.md) for details
 
 ### 🚀 MLX Framework Support (v2.3 - Resolved)
 - **MLX Issue Fixed** - Resolved conflicts with instructlab package
@@ -479,6 +500,24 @@ Contributions are welcome! Please:
 5. Open a Pull Request
 
 ## 🖄 Version History
+
+### v2.4.0 (2025-09-28) - LLM Integration Fix & Token Monitoring
+- 🤖 **LLM Integration Fixed**
+  - Resolved issue where `--enable-llm` flag had no effect
+  - Now properly uses `EnhancedAvatarSystemManager` for LLM analysis
+  - Automatic fallback to basic analysis if API key missing
+  - Clear console output showing LLM status and progress
+- 💰 **Token Monitoring System**
+  - Real-time Anthropic API token tracking
+  - Cost calculation and daily usage limits
+  - Session management with detailed reports
+  - SQLite database for usage history
+  - CLI tools for balance checking and reporting
+- 🔧 **Improvements**
+  - Async batch processing for LLM analysis
+  - Conservative rate limiting (5 people max initially)
+  - Comprehensive error handling
+  - Token usage displayed in pipeline summary
 
 ### v2.3.0 (2025-09-27) - MLX Framework Resolution
 - 🍏 **MLX Training Support**

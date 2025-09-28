@@ -29,8 +29,10 @@ sys.path.append(str(Path(__file__).parent.parent))
 from imessage_extractor import IMessageExtractor
 from message_data_loader import MessageDataLoader
 from avatar_intelligence_pipeline import AvatarSystemManager
+from enhanced_avatar_pipeline import EnhancedAvatarSystemManager
 from config_manager import ConfigManager
 from security_utils import SecureLogger
+from token_monitor import TokenMonitor
 
 # Configure logging
 logger = SecureLogger(__name__, log_file="logs/extraction_pipeline.log")
@@ -53,6 +55,17 @@ class ExtractionPipeline:
         self.extractor = IMessageExtractor(self.config.get('extractor_config', {}))
         self.config_manager = ConfigManager()
         
+        # Initialize token monitor
+        self.token_monitor = None
+        if self.config.get('token_monitoring', {}).get('enabled', True):
+            try:
+                self.token_monitor = TokenMonitor(self.config.get('token_monitoring'))
+                self.logger.log_event("token_monitoring", {"status": "initialized"})
+            except Exception as e:
+                self.logger.log_event("token_monitoring", 
+                                     {"status": "failed", "error": str(e)}, 
+                                     level="warning")
+        
         # Track pipeline state
         self.state = {
             'started_at': None,
@@ -61,7 +74,8 @@ class ExtractionPipeline:
             'extracted_file': None,
             'messages_processed': 0,
             'profiles_generated': 0,
-            'errors': []
+            'errors': [],
+            'token_usage': {}
         }
     
     def _get_default_config(self) -> Dict[str, Any]:
@@ -84,8 +98,77 @@ class ExtractionPipeline:
                 'checkpoint_dir': 'data/checkpoints',
                 'continue_on_error': False,
                 'max_retries': 3
+            },
+            'token_monitoring': {
+                'enabled': True,
+                'display': {
+                    'show_per_request': False,
+                    'show_session_summary': True,
+                    'show_daily_summary': True,
+                    'format': 'detailed'
+                }
             }
         }
+    
+    def _capture_token_balance(self, stage: str, phase: str = "before") -> Optional[Dict[str, Any]]:
+        """
+        Capture token balance before or after an operation
+        
+        Args:
+            stage: Name of the pipeline stage
+            phase: "before" or "after"
+            
+        Returns:
+            Token balance information if available
+        """
+        if not self.token_monitor:
+            return None
+        
+        balance = self.token_monitor.get_balance()
+        if balance:
+            key = f"{stage}_{phase}"
+            self.state['token_usage'][key] = {
+                "timestamp": datetime.now().isoformat(),
+                "daily_used": balance['daily_used'],
+                "daily_remaining": balance['daily_remaining'],
+                "percent_used": balance['percent_used'],
+                "cost_today": balance['cost_today']
+            }
+            
+            self.logger.log_event("token_balance", {
+                "stage": stage,
+                "phase": phase,
+                "tokens_used": balance['daily_used'],
+                "cost": balance['cost_today']
+            })
+            
+            return balance
+        return None
+    
+    def _display_token_usage_delta(self, stage: str):
+        """
+        Display token usage delta for a stage
+        
+        Args:
+            stage: Name of the pipeline stage
+        """
+        if not self.token_monitor or not self.state['token_usage']:
+            return
+        
+        before_key = f"{stage}_before"
+        after_key = f"{stage}_after"
+        
+        if before_key in self.state['token_usage'] and after_key in self.state['token_usage']:
+            before = self.state['token_usage'][before_key]
+            after = self.state['token_usage'][after_key]
+            
+            tokens_used = after['daily_used'] - before['daily_used']
+            cost_incurred = after['cost_today'] - before['cost_today']
+            
+            print(f"\n📊 Token Usage for {stage.replace('_', ' ').title()}:")
+            print(f"   Tokens Used: {tokens_used:,}")
+            print(f"   Cost: ${cost_incurred:.4f}")
+            print(f"   Daily Usage: {after['percent_used']:.1f}%")
     
     def run_stage_1_extraction(self, message_limit: Optional[int] = None) -> str:
         """
@@ -240,6 +323,9 @@ class ExtractionPipeline:
             "status": "starting"
         })
         
+        # Capture token balance before profiling
+        self._capture_token_balance("profiling", "before")
+        
         try:
             # Initialize Avatar System Manager
             from neo4j import GraphDatabase
@@ -250,11 +336,115 @@ class ExtractionPipeline:
                 auth=(self.config_manager.neo4j.username, self.config_manager.neo4j.password)
             )
             
-            # Initialize the avatar system manager
-            avatar_manager = AvatarSystemManager(driver)
+            # Check if LLM is enabled and use appropriate manager
+            enable_llm = self.config.get('processor_config', {}).get('enable_llm', False)
             
-            # Generate profiles for all people with sufficient data
-            stats = avatar_manager.initialize_all_people(min_messages=50)
+            if enable_llm:
+                # Get API key from environment or config
+                import os
+                api_key = os.getenv('ANTHROPIC_API_KEY')
+                
+                if not api_key:
+                    self.logger.log_event("pipeline_stage", {
+                        "stage": 3,
+                        "warning": "LLM enabled but ANTHROPIC_API_KEY not set, falling back to basic analysis"
+                    }, level="warning")
+                    print("\n⚠️  WARNING: LLM analysis requested but ANTHROPIC_API_KEY environment variable not set!")
+                    print("   Falling back to basic analysis without LLM enhancement.")
+                    print("   To enable LLM analysis, set: export ANTHROPIC_API_KEY='your-api-key'\n")
+                    
+                    # Fall back to basic analysis
+                    avatar_manager = AvatarSystemManager(driver)
+                    stats = avatar_manager.initialize_all_people(min_messages=50)
+                else:
+                    # Use enhanced avatar manager with LLM
+                    self.logger.log_event("pipeline_stage", {
+                        "stage": 3,
+                        "note": "Using Enhanced Avatar Manager with LLM integration"
+                    })
+                    print("\n🤖 LLM Integration Active:")
+                    print(f"   - API Key: {'*' * 8}{api_key[-4:]}")
+                    print(f"   - Model: claude-sonnet-4-20250514")
+                    print(f"   - Token Monitoring: Enabled\n")
+                    
+                    avatar_manager = EnhancedAvatarSystemManager(
+                        neo4j_driver=driver,
+                        anthropic_api_key=api_key,
+                        claude_model="claude-sonnet-4-20250514",
+                        enable_llm_analysis=True
+                    )
+                    
+                    # Get list of people to analyze
+                    with driver.session() as session:
+                        result = session.run("""
+                        MATCH (p:Person)-[:SENT|RECEIVED]-(m:Message)
+                        WITH p, COUNT(m) AS message_count
+                        WHERE message_count >= $min_messages
+                        RETURN p.id AS person_id, p.name AS name, message_count
+                        ORDER BY message_count DESC
+                        """, min_messages=50)
+                        
+                        people_to_analyze = [
+                            {"id": record["person_id"], "name": record["name"], "messages": record["message_count"]}
+                            for record in result
+                        ]
+                    
+                    print(f"📊 Found {len(people_to_analyze)} people with sufficient data for analysis")
+                    
+                    if people_to_analyze:
+                        # Run async batch processing
+                        import asyncio
+                        
+                        async def run_llm_analysis():
+                            identifiers = [p["name"] for p in people_to_analyze[:5]]  # Limit to 5 for cost control
+                            
+                            print(f"🔍 Analyzing top {len(identifiers)} people with LLM enhancement...")
+                            for i, person in enumerate(people_to_analyze[:5], 1):
+                                print(f"   {i}. {person['name']} ({person['messages']} messages)")
+                            
+                            results = await avatar_manager.batch_create_profiles(
+                                person_identifiers=identifiers,
+                                min_messages=50,
+                                max_concurrent=1  # Reduced to avoid rate limits
+                            )
+                            
+                            return results
+                        
+                        # Run the async analysis
+                        llm_results = asyncio.run(run_llm_analysis())
+                        
+                        # Process results
+                        successful = sum(1 for r in llm_results if r.get("status") == "success")
+                        failed = len(llm_results) - successful
+                        total_cost = sum(r.get("total_cost", 0.0) for r in llm_results)
+                        
+                        stats = {
+                            "created": successful,
+                            "failed": failed,
+                            "total": len(llm_results),
+                            "llm_enhanced": True,
+                            "total_cost": total_cost,
+                            "details": llm_results
+                        }
+                        
+                        print(f"\n✅ LLM Analysis Complete:")
+                        print(f"   - Profiles Created: {successful}")
+                        print(f"   - Failed: {failed}")
+                        print(f"   - Total Cost: ${total_cost:.4f}")
+                        
+                        # Also run basic analysis for remaining people if needed
+                        if len(people_to_analyze) > 5:
+                            print(f"\n📝 Running basic analysis for remaining {len(people_to_analyze) - 5} people...")
+                            basic_manager = AvatarSystemManager(driver)
+                            basic_stats = basic_manager.initialize_all_people(min_messages=50)
+                            stats["basic_analysis"] = basic_stats
+                    else:
+                        stats = {"created": 0, "message": "No people with sufficient messages"}
+            else:
+                # Use basic avatar manager
+                print("\n📝 Running basic personality analysis (LLM disabled)")
+                avatar_manager = AvatarSystemManager(driver)
+                stats = avatar_manager.initialize_all_people(min_messages=50)
             
             # Get the actual profile count from stats
             profiles_count = stats.get('created', 0)
@@ -273,12 +463,23 @@ class ExtractionPipeline:
             self.state['profiles_generated'] = profiles_count
             self.state['stages_completed'].append('profiling')
             
+            # Capture token balance after profiling
+            self._capture_token_balance("profiling", "after")
+            
+            # Display token usage delta
+            self._display_token_usage_delta("profiling")
+            
             results = {
                 'profiles_generated': profiles_count,
                 'output_file': str(stats_file),
                 'stats': stats,
                 'timestamp': datetime.now().isoformat()
             }
+            
+            # Add token usage to results if available
+            if self.token_monitor:
+                session_summary = self.token_monitor.get_session_summary(format="compact")
+                results['token_usage'] = session_summary
             
             # Clean up driver
             driver.close()
@@ -362,6 +563,17 @@ class ExtractionPipeline:
             # Complete
             self.state['completed_at'] = datetime.now().isoformat()
             
+            # Add token usage summary to state if available
+            if self.token_monitor:
+                self.state['token_usage']['final_summary'] = {
+                    "session_summary": self.token_monitor.get_session_summary(format="compact"),
+                    "daily_usage": self.token_monitor.get_daily_usage(),
+                    "balance": self.token_monitor.get_balance()
+                }
+                
+                # End the monitoring session
+                session_end = self.token_monitor.end_session()
+            
             # Generate summary
             summary = {
                 'status': 'completed',
@@ -372,6 +584,7 @@ class ExtractionPipeline:
                 'profiles_generated': self.state['profiles_generated'],
                 'extracted_file': self.state['extracted_file'],
                 'errors': self.state['errors'],
+                'token_usage': self.state['token_usage'],
                 'results': {
                     'extraction': {'file': json_file} if json_file else None,
                     'processing': processing_results,

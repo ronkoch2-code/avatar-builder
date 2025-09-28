@@ -31,6 +31,10 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
+# Import token monitor and rate limiter
+from token_monitor import TokenMonitor
+from rate_limiter import AdaptiveRateLimiter
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -130,7 +134,8 @@ class LLMIntegrator:
                  api_key: Optional[str] = None,
                  model: str = "claude-sonnet-4-20250514",
                  max_concurrent: int = 5,
-                 rate_limit_per_minute: int = 100):
+                 rate_limit_per_minute: int = 100,
+                 enable_token_monitoring: bool = True):
         """
         Initialize LLM integrator
         
@@ -139,6 +144,7 @@ class LLMIntegrator:
             model: Claude model to use
             max_concurrent: Maximum concurrent API calls
             rate_limit_per_minute: Rate limit for API calls
+            enable_token_monitoring: Enable token usage tracking
         """
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
@@ -149,7 +155,24 @@ class LLMIntegrator:
         self.max_concurrent = max_concurrent
         self.rate_limit_per_minute = rate_limit_per_minute
         
-        # Cost tracking
+        # Initialize rate limiter
+        self.rate_limiter = AdaptiveRateLimiter(
+            initial_calls_per_minute=rate_limit_per_minute,
+            min_calls_per_minute=2,  # Very conservative minimum
+            max_calls_per_minute=rate_limit_per_minute * 2,
+            burst_size=5  # Allow small bursts
+        )
+        logger.info(f"Adaptive rate limiting enabled: {rate_limit_per_minute} calls/min")
+        
+        # Initialize token monitor if enabled
+        self.enable_token_monitoring = enable_token_monitoring
+        if self.enable_token_monitoring:
+            self.token_monitor = TokenMonitor()
+            logger.info("Token monitoring enabled")
+        else:
+            self.token_monitor = None
+        
+        # Cost tracking (legacy - kept for backward compatibility)
         self.total_tokens = 0
         self.total_cost = 0.0
         self.analysis_history = []
@@ -244,12 +267,12 @@ class LLMIntegrator:
         else:
             raise ValueError("Failed to parse JSON from LLM response - invalid format")
     
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def _call_llm(self, 
                        system_prompt: str, 
                        user_prompt: str,
                        max_tokens: Optional[int] = None,
-                       temperature: Optional[float] = None) -> Tuple[str, Dict[str, Any]]:
+                       temperature: Optional[float] = None,
+                       operation: str = "general") -> Tuple[str, Dict[str, Any]]:
         """
         Make API call to Claude with retry logic and error handling
         
@@ -258,6 +281,7 @@ class LLMIntegrator:
             user_prompt: User's input prompt
             max_tokens: Maximum tokens for response (default: 4000)
             temperature: Temperature for response (default: 0.1)
+            operation: Type of operation for tracking purposes
             
         Returns:
             Tuple of (response_text, metadata)
@@ -266,6 +290,9 @@ class LLMIntegrator:
             anthropic.APIError: For API-related errors
             ValueError: For invalid responses
         """
+        # Acquire rate limit token before making call
+        await self.rate_limiter.acquire()
+        
         try:
             start_time = datetime.now()
             
@@ -300,6 +327,16 @@ class LLMIntegrator:
             self.total_tokens += input_tokens + output_tokens
             self.total_cost += cost
             
+            # Track tokens with monitor if enabled
+            if self.token_monitor:
+                self.token_monitor.track_request(
+                    model=self.model,
+                    operation=operation,
+                    response=response,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens
+                )
+            
             metadata = {
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
@@ -307,16 +344,22 @@ class LLMIntegrator:
                 "cost": cost,
                 "processing_time": processing_time,
                 "model": self.model,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "operation": operation
             }
             
             # Log successful call (without sensitive data)
-            logger.info(f"LLM call successful: {input_tokens} input, {output_tokens} output tokens")
+            logger.info(f"LLM call successful: {input_tokens} input, {output_tokens} output tokens for {operation}")
+            
+            # Report success to rate limiter
+            await self.rate_limiter.report_success()
             
             return response.content[0].text, metadata
             
         except anthropic.RateLimitError as e:
             logger.error(f"Rate limit exceeded: {e}")
+            # Report rate limit error to adaptive limiter
+            await self.rate_limiter.report_error(429)
             raise
         except anthropic.APIConnectionError as e:
             logger.error(f"API connection error: {e}")
@@ -415,7 +458,11 @@ Required JSON structure:
 Remember to respond ONLY with a valid JSON object following the specified format. No additional text or formatting."""
         
         try:
-            response_text, metadata = await self._call_llm(system_prompt, user_prompt)
+            response_text, metadata = await self._call_llm(
+                system_prompt, 
+                user_prompt,
+                operation="personality_analysis"
+            )
             
             # Parse JSON response with robust extraction
             analysis_data = self._extract_json_from_response(response_text)
@@ -531,7 +578,11 @@ Required JSON structure:
 Remember to respond ONLY with a valid JSON object following the specified format."""
             
             try:
-                response_text, metadata = await self._call_llm(system_prompt, user_prompt)
+                response_text, metadata = await self._call_llm(
+                    system_prompt, 
+                    user_prompt,
+                    operation="relationship_analysis"
+                )
                 
                 # Parse JSON response with robust extraction
                 analysis_data = self._extract_json_from_response(response_text)
@@ -552,6 +603,10 @@ Remember to respond ONLY with a valid JSON object following the specified format
                 
                 results.append(result)
                 self.analysis_history.append(result)
+                
+                # Add small delay between relationship analyses to avoid rate limits
+                if len(partner_conversations) > 1:
+                    await asyncio.sleep(1.0)  # 1 second delay between analyses
                 
             except (json.JSONDecodeError, ValidationError, ValueError) as e:
                 logger.error(f"Failed to parse relationship analysis for {partner_name}: {str(e)}")
@@ -622,13 +677,23 @@ Remember to respond ONLY with a valid JSON object following the specified format
     
     def get_cost_summary(self) -> Dict[str, Any]:
         """Get summary of API costs and usage"""
-        return {
+        summary = {
             "total_tokens": self.total_tokens,
             "total_cost": round(self.total_cost, 4),
             "total_analyses": len(self.analysis_history),
             "average_cost_per_analysis": round(self.total_cost / max(1, len(self.analysis_history)), 4),
             "cost_by_type": self._get_cost_by_analysis_type()
         }
+        
+        # Add token monitor summary if available
+        if self.token_monitor:
+            summary["token_monitor"] = {
+                "session_summary": self.token_monitor.get_session_summary(format="compact"),
+                "daily_usage": self.token_monitor.get_daily_usage(),
+                "balance": self.token_monitor.get_balance()
+            }
+        
+        return summary
     
     def _get_cost_by_analysis_type(self) -> Dict[str, Dict[str, Any]]:
         """Get cost breakdown by analysis type"""
@@ -644,6 +709,21 @@ Remember to respond ONLY with a valid JSON object following the specified format
             costs_by_type[analysis_type]["total_tokens"] += analysis.tokens_used
         
         return costs_by_type
+    
+    def end_monitoring_session(self) -> Optional[Dict[str, Any]]:
+        """End the current token monitoring session and return summary"""
+        if self.token_monitor:
+            session_summary = self.token_monitor.end_session()
+            return {
+                "session_id": session_summary.session_id,
+                "duration": str(session_summary.end_time - session_summary.start_time) if session_summary.end_time else None,
+                "total_tokens": session_summary.total_tokens,
+                "total_cost": session_summary.total_cost,
+                "cache_savings": session_summary.total_cache_savings,
+                "num_requests": session_summary.num_requests,
+                "operations": session_summary.operations
+            }
+        return None
 
 
 # Example usage
