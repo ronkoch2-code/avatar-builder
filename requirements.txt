@@ -38,6 +38,16 @@ networkx>=3.1                    # Graph analysis
 matplotlib>=3.7.0                # Visualization
 seaborn>=0.12.0                  # Statistical visualization
 
+# Nickname extraction dependencies
+textdistance>=4.6.0               # String similarity for nickname matching
+nltk>=3.8.0                      # Natural language toolkit (optional)
+
+# macOS-specific dependencies (install separately with: pip3 install -r requirements-macos.txt)
+# pyobjc-core>=10.0               # Core PyObjC framework
+# pyobjc-framework-Cocoa>=10.0   # Cocoa framework  
+# pyobjc-framework-Contacts>=10.0 # macOS Contacts/AddressBook access
+# pyobjc-framework-AddressBook>=10.0 # Legacy AddressBook framework
+
 # Optional dependencies for advanced features (commented out)
 # langchain>=0.1.0               # LLM orchestration framework
 # chromadb>=0.4.0                # Vector database for embeddings

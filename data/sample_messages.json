@@ -1,0 +1,72 @@
+[
+  {
+    "sender": "user_001",
+    "text": "Hey Bob, are you coming to the meeting today?",
+    "timestamp": "2025-09-29T09:00:00"
+  },
+  {
+    "sender": "user_002",
+    "text": "Hi! Yes, Robert here. I'll be there at 10am.",
+    "timestamp": "2025-09-29T09:02:00"
+  },
+  {
+    "sender": "user_001",
+    "text": "Perfect! Also, can you check with Liz about the design mockups?",
+    "timestamp": "2025-09-29T09:03:00"
+  },
+  {
+    "sender": "user_002",
+    "text": "Sure thing! I'll ping Elizabeth right after our meeting. BTW, Mike Chen said he'd join us too.",
+    "timestamp": "2025-09-29T09:05:00"
+  },
+  {
+    "sender": "user_003",
+    "text": "Hey guys, it's Lizzie. Just saw your message Bobby! The mockups are ready for review.",
+    "timestamp": "2025-09-29T09:10:00"
+  },
+  {
+    "sender": "user_002",
+    "text": "Awesome, thanks Beth! Mike, are you there?",
+    "timestamp": "2025-09-29T09:12:00"
+  },
+  {
+    "sender": "user_004",
+    "text": "Professor Chen here! Sorry, running a bit late from my lecture. Be there in 5.",
+    "timestamp": "2025-09-29T09:15:00"
+  },
+  {
+    "sender": "user_001",
+    "text": "@alex_rodriguez just messaged - she wants to join the design review too",
+    "timestamp": "2025-09-29T09:18:00"
+  },
+  {
+    "sender": "user_005",
+    "text": "Hi team! This is Alexandra. Looking forward to seeing what you've all been working on.",
+    "timestamp": "2025-09-29T09:20:00"
+  },
+  {
+    "sender": "user_003",
+    "text": "Welcome Alex! We've made great progress. Rob and I worked on it all weekend.",
+    "timestamp": "2025-09-29T09:22:00"
+  },
+  {
+    "sender": "user_005",
+    "text": "Thanks Liz! I appreciate the dedication. Bill Anderson from legal will need to review it too.",
+    "timestamp": "2025-09-29T09:25:00"
+  },
+  {
+    "sender": "user_006",
+    "text": "William here - just caught up on the thread. Happy to review from a legal perspective.",
+    "timestamp": "2025-09-29T09:30:00"
+  },
+  {
+    "sender": "user_004",
+    "text": "Great to have you on board, Will! \n\n- Mike",
+    "timestamp": "2025-09-29T09:32:00"
+  },
+  {
+    "sender": "user_002",
+    "text": "Alright team, let's wrap this up. Thanks everyone!\n\nBest,\nRob",
+    "timestamp": "2025-09-29T10:45:00"
+  }
+]

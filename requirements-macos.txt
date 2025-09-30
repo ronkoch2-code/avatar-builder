@@ -1,0 +1,9 @@
+# macOS-specific requirements for Avatar-Engine
+# Install these only on macOS systems
+# Run: pip3 install -r requirements-macos.txt
+
+# PyObjC frameworks for macOS integration
+pyobjc-core>=10.0
+pyobjc-framework-Cocoa>=10.0
+pyobjc-framework-Contacts>=10.0
+pyobjc-framework-AddressBook>=10.0
